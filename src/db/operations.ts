@@ -56,7 +56,25 @@ export async function saveInputAnalysis(projectId: string, title: string, analys
   await db.update(projects).set({
     title,
     inputAnalysis: analysis,
-    status: 'world_building',
+    status: 'clarifying',
+    updatedAt: new Date().toISOString(),
+  }).where(eq(projects.id, projectId));
+}
+
+export async function saveInputAnalysisData(projectId: string, title: string, analysis: unknown) {
+  const db = getDb();
+  await db.update(projects).set({
+    title,
+    inputAnalysis: analysis,
+    updatedAt: new Date().toISOString(),
+  }).where(eq(projects.id, projectId));
+}
+
+export async function saveClarification(projectId: string, questions: string[], answers?: string[]) {
+  const db = getDb();
+  await db.update(projects).set({
+    clarifyQuestions: questions,
+    ...(answers ? { clarifyAnswers: answers } : {}),
     updatedAt: new Date().toISOString(),
   }).where(eq(projects.id, projectId));
 }
@@ -65,7 +83,7 @@ export async function saveWorldBuilding(projectId: string, world: WorldBuilding)
   const db = getDb();
   await db.update(projects).set({
     worldBuilding: world,
-    status: 'character_design',
+    status: 'review_world',
     updatedAt: new Date().toISOString(),
   }).where(eq(projects.id, projectId));
 }
@@ -88,7 +106,7 @@ export async function saveCharacters(projectId: string, chars: Character[]) {
     });
   }
   await db.update(projects).set({
-    status: 'outline',
+    status: 'review_characters',
     updatedAt: new Date().toISOString(),
   }).where(eq(projects.id, projectId));
 }
@@ -97,7 +115,47 @@ export async function savePlotOutline(projectId: string, outline: PlotOutline) {
   const db = getDb();
   await db.update(projects).set({
     plotOutline: outline,
-    status: 'review',
+    status: 'review_outline',
+    updatedAt: new Date().toISOString(),
+  }).where(eq(projects.id, projectId));
+}
+
+// ─── 仅保存数据（不更新状态，用于用户编辑） ───
+
+export async function saveWorldBuildingData(projectId: string, world: WorldBuilding) {
+  const db = getDb();
+  await db.update(projects).set({
+    worldBuilding: world,
+    updatedAt: new Date().toISOString(),
+  }).where(eq(projects.id, projectId));
+}
+
+export async function saveCharactersData(projectId: string, chars: Character[]) {
+  const db = getDb();
+  await db.delete(characters).where(eq(characters.projectId, projectId));
+  for (const c of chars) {
+    await db.insert(characters).values({
+      id: c.id,
+      projectId,
+      name: c.name,
+      role: c.role,
+      description: c.description,
+      backstory: c.backstory,
+      motivations: c.motivations,
+      relationships: c.relationships,
+      voiceNotes: c.voiceNotes,
+      arc: c.arc,
+    });
+  }
+  await db.update(projects).set({
+    updatedAt: new Date().toISOString(),
+  }).where(eq(projects.id, projectId));
+}
+
+export async function savePlotOutlineData(projectId: string, outline: PlotOutline) {
+  const db = getDb();
+  await db.update(projects).set({
+    plotOutline: outline,
     updatedAt: new Date().toISOString(),
   }).where(eq(projects.id, projectId));
 }
@@ -183,10 +241,15 @@ export async function loadPipelineState(projectId: string): Promise<PipelineStat
     if (ch.ending) chapterEndings.set(ch.number, ch.ending);
   }
 
+  // 兼容旧数据：将 'review' 映射为 'review_outline'
+  const status = project.status === 'review' ? 'review_outline' : project.status;
+
   return {
     projectId,
-    status: project.status as PipelineState['status'],
+    status: status as PipelineState['status'],
     userPrompt: project.userPrompt,
+    clarifyQuestions: (project.clarifyQuestions as string[] | null) ?? undefined,
+    clarifyAnswers: (project.clarifyAnswers as string[] | null) ?? undefined,
     worldBuilding: project.worldBuilding as WorldBuilding | undefined,
     characters: chars.map((c) => ({
       id: c.id,

@@ -12,6 +12,10 @@ export const projects = sqliteTable('projects', {
   plotOutline: text('plot_outline', { mode: 'json' }),
   /** 输入分析结果 JSON（中间状态，用于恢复） */
   inputAnalysis: text('input_analysis', { mode: 'json' }),
+  /** 追问问题 JSON */
+  clarifyQuestions: text('clarify_questions', { mode: 'json' }),
+  /** 追问回答 JSON */
+  clarifyAnswers: text('clarify_answers', { mode: 'json' }),
   /** 滚动摘要文本 */
   plotSummary: text('plot_summary'),
   /** 当前正在生成的章节号 */

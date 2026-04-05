@@ -27,6 +27,11 @@ export interface ProjectDetail {
     description: string;
     backstory: string;
     motivations: string[];
+    relationships: {
+      targetCharacterId: string;
+      type: string;
+      description: string;
+    }[];
     voiceNotes: string;
     arc: string;
   }[];
@@ -87,4 +92,28 @@ export async function deleteProject(id: string): Promise<void> {
 
 export function getExportUrl(id: string): string {
   return `${BASE}/projects/${id}/export`;
+}
+
+export async function approveStage(id: string, editedData?: unknown): Promise<{ ok: boolean; nextStatus: string }> {
+  return fetchJSON(`${BASE}/projects/${id}/approve`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(editedData ? { editedData } : {}),
+  });
+}
+
+export async function rejectStage(id: string): Promise<{ ok: boolean; regenTarget: string }> {
+  return fetchJSON(`${BASE}/projects/${id}/reject`, { method: 'POST' });
+}
+
+export async function pauseGeneration(id: string): Promise<{ ok: boolean }> {
+  return fetchJSON(`${BASE}/projects/${id}/pause`, { method: 'POST' });
+}
+
+export async function submitClarification(id: string, answers: string[]): Promise<{ ok: boolean; nextStatus: string }> {
+  return fetchJSON(`${BASE}/projects/${id}/clarify`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ answers }),
+  });
 }

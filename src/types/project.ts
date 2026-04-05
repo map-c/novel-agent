@@ -2,11 +2,15 @@ export type InputMode = 'freeform' | 'synopsis';
 
 export type PipelineStatus =
   | 'input'
+  | 'clarifying'
   | 'world_building'
+  | 'review_world'
   | 'character_design'
+  | 'review_characters'
   | 'outline'
-  | 'review'
+  | 'review_outline'
   | 'generating'
+  | 'paused'
   | 'complete';
 
 export interface Project {

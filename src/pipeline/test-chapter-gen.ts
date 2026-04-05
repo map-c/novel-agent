@@ -66,9 +66,17 @@ async function main() {
   // 跑到审阅门控
   await engine.run();
 
-  // 自动审阅通过，开始生成
-  if (engine.currentState.status === 'review') {
-    await engine.approve();
+  // 自动通过所有审阅门控（包括追问）
+  const gates = ['clarifying', 'review_world', 'review_characters', 'review_outline'] as const;
+  while (gates.includes(engine.currentState.status as typeof gates[number])) {
+    const status = engine.currentState.status;
+    if (status === 'clarifying') {
+      console.log('\n>> 模拟追问回答（跳过）');
+      await engine.submitClarification(['由 AI 自行决定']);
+    } else {
+      console.log(`\n>> 自动审阅通过: ${status}`);
+      await engine.approve();
+    }
   }
 
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);

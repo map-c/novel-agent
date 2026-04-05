@@ -5,17 +5,26 @@ import type { PipelineStatus } from '../types/project.js';
  * 每个状态列出它可以转移到的下一个状态
  */
 const transitions: Record<PipelineStatus, PipelineStatus[]> = {
-  input:            ['world_building'],
-  world_building:   ['character_design'],
-  character_design: ['outline'],
-  outline:          ['review'],
-  review:           ['generating', 'outline'],  // 审阅通过 → generating，驳回 → 回到 outline
-  generating:       ['complete'],
-  complete:         [],
+  input:             ['clarifying'],
+  clarifying:        ['world_building'],
+  world_building:    ['review_world'],
+  review_world:      ['character_design', 'world_building'],   // 通过 → character_design，驳回 → 重新生成
+  character_design:  ['review_characters'],
+  review_characters: ['outline', 'character_design'],          // 通过 → outline，驳回 → 重新生成
+  outline:           ['review_outline'],
+  review_outline:    ['generating', 'outline'],                // 通过 → generating，驳回 → 重新生成
+  generating:        ['paused', 'complete'],
+  paused:            ['generating'],
+  complete:          [],
 };
 
 /** 需要暂停等待人工确认的状态 */
-const REVIEW_GATES: Set<PipelineStatus> = new Set(['review']);
+const REVIEW_GATES: Set<PipelineStatus> = new Set([
+  'clarifying',
+  'review_world',
+  'review_characters',
+  'review_outline',
+]);
 
 export class PipelineStateMachine {
   private _status: PipelineStatus;

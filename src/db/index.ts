@@ -9,8 +9,9 @@ export function getDb(dbPath = 'novel-agent.db') {
     const client = createClient({ url: `file:${dbPath}` });
     db = drizzle(client, { schema });
 
-    // 自动建表
+    // 自动建表 + 迁移
     initTables(client);
+    migrate(client);
   }
   return db;
 }
@@ -57,6 +58,19 @@ function initTables(client: ReturnType<typeof createClient>) {
       ending TEXT
     );
   `);
+}
+
+function migrate(client: ReturnType<typeof createClient>) {
+  // 检查列是否存在后再添加（避免 duplicate column 错误）
+  client.execute("PRAGMA table_info(projects)").then((result) => {
+    const columns = new Set(result.rows.map((r) => r[1] as string));
+    if (!columns.has('clarify_questions')) {
+      client.execute('ALTER TABLE projects ADD COLUMN clarify_questions TEXT');
+    }
+    if (!columns.has('clarify_answers')) {
+      client.execute('ALTER TABLE projects ADD COLUMN clarify_answers TEXT');
+    }
+  });
 }
 
 export { schema };
