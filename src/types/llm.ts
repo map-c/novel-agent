@@ -3,3 +3,9 @@ export interface LLMConfig {
   temperature?: number;
   maxTokens?: number;
 }
+
+export interface TokenUsage {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+}

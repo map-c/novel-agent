@@ -1,5 +1,5 @@
 import { streamLLM } from '../../llm/index.js';
-import type { LLMConfig } from '../../types/llm.js';
+import type { LLMConfig, TokenUsage } from '../../types/llm.js';
 import type { ChapterContext } from '../context-manager.js';
 import { DEFAULT_PROMPTS } from '../../config/defaults.js';
 
@@ -12,6 +12,7 @@ export async function runChapterAgent(
   config: LLMConfig,
   onChunk?: (chunk: string) => void,
   systemPrompt?: string,
+  onUsage?: (usage: TokenUsage) => void,
 ): Promise<string> {
   const system = systemPrompt ?? DEFAULT_PROMPTS['chapter'];
   const stream = streamLLM(
@@ -26,6 +27,9 @@ export async function runChapterAgent(
     fullText += chunk;
     onChunk?.(chunk);
   }
+
+  const usage = await stream.usage;
+  if (usage) onUsage?.(usage as TokenUsage);
 
   return fullText;
 }

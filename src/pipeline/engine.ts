@@ -1,7 +1,7 @@
 import { nanoid } from 'nanoid';
 import type { PipelineStatus, WorldBuilding, Character, PlotOutline } from '../types/project.js';
 import type { PipelineState } from '../types/pipeline.js';
-import type { LLMConfig } from '../types/llm.js';
+import type { LLMConfig, TokenUsage } from '../types/llm.js';
 import { PipelineStateMachine } from './state-machine.js';
 import { runInputAgent, type InputAnalysis } from './agents/input-agent.js';
 import { runWorldAgent } from './agents/world-agent.js';
@@ -22,6 +22,7 @@ export interface PipelineCallbacks {
   onChapterComplete?: (chapterNumber: number, content: string) => void;
   onClarifyQuestions?: (questions: string[]) => void;
   onError?: (error: Error) => void;
+  onUsage?: (stage: string, model: string, usage: TokenUsage) => void;
 }
 
 export interface PipelineModelConfig {
@@ -287,12 +288,19 @@ export class PipelineEngine {
     }
   }
 
+  /** 创建绑定了 stage 名和 model 的 usage 回调 */
+  private usageHandler(stage: string, model: string) {
+    return (usage: TokenUsage) => {
+      this.callbacks.onUsage?.(stage, model, usage);
+    };
+  }
+
   private async stageInput() {
-    const analysis = await runInputAgent(this.state.userPrompt!, this.models.planning, this.prompts['input']);
+    const analysis = await runInputAgent(this.state.userPrompt!, this.models.planning, this.prompts['input'], this.usageHandler('input', this.models.planning.model));
     this.inputAnalysis = analysis;
 
     // 生成追问问题
-    const questions = await runClarifyAgent(analysis, this.models.planning, this.prompts['clarify']);
+    const questions = await runClarifyAgent(analysis, this.models.planning, this.prompts['clarify'], this.usageHandler('clarify', this.models.planning.model));
     this.state.clarifyQuestions = questions;
 
     if (this.persist) {
@@ -314,7 +322,7 @@ export class PipelineEngine {
 
     this.state.clarifyAnswers = answers;
     const qa = this.state.clarifyQuestions.map((q, i) => ({ question: q, answer: answers[i] ?? '' }));
-    const refined = await runRefineAgent(this.inputAnalysis, qa, this.models.planning, this.prompts['refine']);
+    const refined = await runRefineAgent(this.inputAnalysis, qa, this.models.planning, this.prompts['refine'], this.usageHandler('refine', this.models.planning.model));
     this.inputAnalysis = refined;
 
     if (this.persist) {
@@ -334,7 +342,7 @@ export class PipelineEngine {
 
   private async stageWorldBuilding() {
     if (!this.inputAnalysis) throw new Error('Input analysis not available');
-    const world = await runWorldAgent(this.inputAnalysis, this.models.planning, this.prompts['world']);
+    const world = await runWorldAgent(this.inputAnalysis, this.models.planning, this.prompts['world'], this.usageHandler('world_building', this.models.planning.model));
     this.state.worldBuilding = world;
     if (this.persist) await db.saveWorldBuilding(this.state.projectId, world);
     this.callbacks.onStageComplete?.('world_building', world);
@@ -346,7 +354,7 @@ export class PipelineEngine {
     }
     const result = await runCharacterAgent(this.inputAnalysis, this.state.worldBuilding, this.models.planning, (chunk) => {
       this.callbacks.onStageChunk?.('character_design', chunk);
-    }, this.prompts['character']);
+    }, this.prompts['character'], this.usageHandler('character_design', this.models.planning.model));
 
     this.state.characters = result.characters.map((c) => ({
       id: nanoid(),
@@ -404,7 +412,7 @@ export class PipelineEngine {
 
     const outline = await runOutlineAgent(this.inputAnalysis, this.state.worldBuilding, charDesign, this.models.planning, (chunk) => {
       this.callbacks.onStageChunk?.('outline', chunk);
-    }, this.prompts['outline']);
+    }, this.prompts['outline'], this.usageHandler('outline', this.models.planning.model));
     this.state.plotOutline = outline;
     if (this.persist) await db.savePlotOutline(this.state.projectId, outline);
     this.callbacks.onStageComplete?.('outline', outline);
@@ -416,6 +424,8 @@ export class PipelineEngine {
     const ctxManager = new ContextManager(this.state, this.models.writing, this.models.summary, {
       summary: this.prompts['summary'],
       compress: this.prompts['compress'],
+    }, (stage, usage) => {
+      this.callbacks.onUsage?.(stage, this.models.summary.model, usage);
     });
     const totalChapters = this.state.plotOutline.totalChapters;
 
@@ -433,7 +443,7 @@ export class PipelineEngine {
 
       const content = await runChapterAgent(context, this.models.writing, (chunk) => {
         this.callbacks.onChapterChunk?.(i, chunk);
-      }, this.prompts['chapter']);
+      }, this.prompts['chapter'], this.usageHandler(`chapter_${i}`, this.models.writing.model));
 
       const chapter = {
         id: nanoid(),

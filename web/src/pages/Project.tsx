@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, Link } from 'react-router';
-import { getProject, getExportUrl, approveStage, rejectStage, pauseGeneration, submitClarification, type ProjectDetail } from '../api';
+import { getProject, getExportUrl, approveStage, rejectStage, pauseGeneration, submitClarification, getUsage, getFeedback, submitFeedback, type ProjectDetail, type UsageSummary, type FeedbackRecord } from '../api';
 import { useSSE, type SSEEvent } from '../hooks/useSSE';
 
 const STAGE_LABELS: Record<string, string> = {
@@ -26,6 +26,12 @@ const STAGES = [
 
 const REVIEW_STAGES = new Set(['review_world', 'review_characters', 'review_outline']);
 
+const feedbackTargetMap: Record<string, string> = {
+  review_world: 'world',
+  review_characters: 'characters',
+  review_outline: 'outline',
+};
+
 export default function Project() {
   const { id } = useParams<{ id: string }>();
   const [project, setProject] = useState<ProjectDetail | null>(null);
@@ -37,6 +43,10 @@ export default function Project() {
   const [actionLoading, setActionLoading] = useState(false);
   const [clarifyQuestions, setClarifyQuestions] = useState<string[]>([]);
   const [stageStreamingText, setStageStreamingText] = useState('');
+  const [usageData, setUsageData] = useState<UsageSummary | null>(null);
+  const [feedbackData, setFeedbackData] = useState<FeedbackRecord[]>([]);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [confirmReject, setConfirmReject] = useState(false);
   const streamingRef = useRef('');
   const stageStreamingRef = useRef('');
 
@@ -46,6 +56,8 @@ export default function Project() {
     const p = await getProject(id);
     setProject(p);
     setStage(p.status);
+    getUsage(id).then(setUsageData).catch(() => {});
+    getFeedback(id).then(setFeedbackData).catch(() => {});
   }, [id]);
 
   useEffect(() => { loadProject(); }, [loadProject]);
@@ -105,14 +117,37 @@ export default function Project() {
         setSseUrl(null);
         loadProject();
         break;
+      case 'usage':
+        // 实时累加 usage 数据
+        setUsageData((prev) => {
+          const e = event as { stage: string; model: string; promptTokens: number; completionTokens: number; totalTokens: number };
+          const stages = [...(prev?.stages ?? [])];
+          const existing = stages.find((s) => s.stage === e.stage);
+          if (existing) {
+            existing.promptTokens += e.promptTokens;
+            existing.completionTokens += e.completionTokens;
+            existing.totalTokens += e.totalTokens;
+            existing.calls += 1;
+          } else {
+            stages.push({ stage: e.stage, model: e.model, promptTokens: e.promptTokens, completionTokens: e.completionTokens, totalTokens: e.totalTokens, calls: 1 });
+          }
+          const total = {
+            promptTokens: stages.reduce((s, r) => s + r.promptTokens, 0),
+            completionTokens: stages.reduce((s, r) => s + r.completionTokens, 0),
+            totalTokens: stages.reduce((s, r) => s + r.totalTokens, 0),
+            calls: stages.reduce((s, r) => s + r.calls, 0),
+          };
+          return { stages, total };
+        });
+        break;
       case 'error':
         setSseUrl(null);
-        console.error('Pipeline error:', event.message);
+        setErrorMsg(`生成出错：${event.message}`);
         break;
     }
   }, [loadProject]);
 
-  const { connected, close: closeSSE } = useSSE(sseUrl, handleSSE);
+  const { connected, retryExhausted, close: closeSSE } = useSSE(sseUrl, handleSSE);
 
   // 启动流水线
   const handleStart = () => {
@@ -123,6 +158,7 @@ export default function Project() {
   const handleApprove = async (editedData?: unknown) => {
     if (!id) return;
     setActionLoading(true);
+    setErrorMsg(null);
     try {
       closeSSE();
       const { nextStatus } = await approveStage(id, editedData);
@@ -135,6 +171,8 @@ export default function Project() {
       } else {
         setSseUrl(`/api/projects/${id}/stream`);
       }
+    } catch (err) {
+      setErrorMsg(`操作失败：${(err as Error).message}`);
     } finally {
       setActionLoading(false);
     }
@@ -144,10 +182,14 @@ export default function Project() {
   const handleReject = async () => {
     if (!id) return;
     setActionLoading(true);
+    setErrorMsg(null);
+    setConfirmReject(false);
     try {
       closeSSE();
       await rejectStage(id);
       setSseUrl(`/api/projects/${id}/stream`);
+    } catch (err) {
+      setErrorMsg(`驳回失败：${(err as Error).message}`);
     } finally {
       setActionLoading(false);
     }
@@ -157,11 +199,13 @@ export default function Project() {
   const handleClarify = async (answers: string[]) => {
     if (!id) return;
     setActionLoading(true);
+    setErrorMsg(null);
     try {
       closeSSE();
       await submitClarification(id, answers);
-      // 重连 SSE 继续流水线
       setSseUrl(`/api/projects/${id}/stream`);
+    } catch (err) {
+      setErrorMsg(`提交失败：${(err as Error).message}`);
     } finally {
       setActionLoading(false);
     }
@@ -170,7 +214,11 @@ export default function Project() {
   // 请求暂停
   const handlePause = async () => {
     if (!id) return;
-    await pauseGeneration(id);
+    try {
+      await pauseGeneration(id);
+    } catch (err) {
+      setErrorMsg(`暂停失败：${(err as Error).message}`);
+    }
   };
 
   // 从暂停恢复
@@ -192,10 +240,10 @@ export default function Project() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-white border-b px-6 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Link to="/" className="text-gray-400 hover:text-gray-600 text-sm">← 返回</Link>
-          <h1 className="text-lg font-semibold text-gray-900">{project.plotOutline?.premise ? project.plotOutline.premise.slice(0, 30) : '新项目'}</h1>
+      <header className="bg-white border-b px-4 sm:px-6 py-3 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+          <Link to="/" className="text-gray-400 hover:text-gray-600 text-sm shrink-0">← 返回</Link>
+          <h1 className="text-sm sm:text-lg font-semibold text-gray-900 truncate">{project.plotOutline?.premise ? project.plotOutline.premise.slice(0, 30) : '新项目'}</h1>
         </div>
         <div className="flex items-center gap-3">
           {connected && <span className="text-xs text-green-500">● 已连接</span>}
@@ -212,7 +260,7 @@ export default function Project() {
 
       {/* 进度条 */}
       <div className="bg-white border-b px-6 py-3">
-        <div className="flex items-center gap-1 max-w-3xl mx-auto">
+        <div className="hidden sm:flex items-center gap-1 max-w-3xl mx-auto">
           {STAGES.map((s, i) => (
             <div key={s} className="flex items-center flex-1">
               <div className={`
@@ -223,13 +271,39 @@ export default function Project() {
             </div>
           ))}
         </div>
-        <div className="text-center text-xs text-gray-500 mt-2">
+        <div className="text-center text-xs text-gray-500 sm:mt-2">
+          <span className="sm:hidden text-gray-400">{stageIndex + 1}/{STAGES.length} · </span>
           {STAGE_LABELS[stage] ?? stage}
         </div>
       </div>
 
       {/* 主体 */}
-      <div className="max-w-4xl mx-auto px-6 py-6">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
+        {/* 错误提示 */}
+        {errorMsg && (
+          <div className="mb-4 bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-lg flex items-center justify-between">
+            <span>{errorMsg}</span>
+            <button onClick={() => setErrorMsg(null)} className="text-red-400 hover:text-red-600 ml-2 shrink-0">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        )}
+
+        {/* SSE 连接断开提示 */}
+        {retryExhausted && (
+          <div className="mb-4 bg-yellow-50 border border-yellow-200 text-yellow-800 text-sm px-4 py-3 rounded-lg flex items-center justify-between">
+            <span>连接已断开，请刷新页面重试</span>
+            <button
+              onClick={() => window.location.reload()}
+              className="text-yellow-700 font-medium hover:underline ml-2 shrink-0"
+            >
+              刷新
+            </button>
+          </div>
+        )}
+
         {/* 待启动 */}
         {stage === 'input' && !sseUrl && (
           <div className="text-center py-20">
@@ -277,6 +351,11 @@ export default function Project() {
             onApprove={(editedData) => handleApprove(editedData)}
             onReject={handleReject}
             loading={actionLoading}
+            feedbackData={feedbackData}
+            onFeedback={async (targetType, rating) => {
+              await submitFeedback(id!, targetType, '', rating);
+              getFeedback(id!).then(setFeedbackData).catch(() => {});
+            }}
           />
         )}
 
@@ -301,7 +380,17 @@ export default function Project() {
             project={project}
             selectedChapter={selectedChapter}
             onSelectChapter={setSelectedChapter}
+            feedbackData={feedbackData}
+            onFeedback={async (targetType, targetId, rating) => {
+              await submitFeedback(id!, targetType, targetId, rating);
+              getFeedback(id!).then(setFeedbackData).catch(() => {});
+            }}
           />
+        )}
+
+        {/* Token 用量 */}
+        {usageData && usageData.total.calls > 0 && (
+          <UsagePanel data={usageData} />
         )}
       </div>
     </div>
@@ -314,14 +403,19 @@ function ReviewView({
   onApprove,
   onReject,
   loading,
+  feedbackData,
+  onFeedback,
 }: {
   project: ProjectDetail;
   stage: string;
   onApprove: (editedData?: unknown) => void;
   onReject: () => void;
   loading: boolean;
+  feedbackData: FeedbackRecord[];
+  onFeedback: (targetType: string, rating: 'satisfied' | 'unsatisfied') => void;
 }) {
   const [editing, setEditing] = useState(false);
+  const [showRejectConfirm, setShowRejectConfirm] = useState(false);
 
   const stageTitle: Record<string, string> = {
     review_world: '世界观',
@@ -376,19 +470,28 @@ function ReviewView({
         </>
       )}
 
-      {/* 操作按钮 */}
+      {/* 反馈 */}
       {!editing && (
-        <div className="flex items-center justify-center gap-4 py-4">
+        <FeedbackButtons
+          currentRating={feedbackData.find((f) => f.targetType === feedbackTargetMap[stage])?.rating}
+          onRate={(rating) => onFeedback(feedbackTargetMap[stage], rating)}
+        />
+      )}
+
+      {/* 操作按钮 */}
+      {!editing && !showRejectConfirm && (
+        <div className="flex flex-wrap items-center justify-center gap-3 py-4">
           <button
             className="text-gray-500 border border-gray-300 px-6 py-2.5 rounded-lg text-sm hover:bg-gray-50 disabled:opacity-50"
-            onClick={onReject}
+            onClick={() => setShowRejectConfirm(true)}
             disabled={loading}
           >
             驳回，重新生成
           </button>
           <button
-            className="text-blue-600 border border-blue-300 px-6 py-2.5 rounded-lg text-sm hover:bg-blue-50"
+            className="text-blue-600 border border-blue-300 px-6 py-2.5 rounded-lg text-sm hover:bg-blue-50 disabled:opacity-50"
             onClick={() => setEditing(true)}
+            disabled={loading}
           >
             编辑
           </button>
@@ -399,6 +502,28 @@ function ReviewView({
           >
             {stage === 'review_outline' ? '确认，开始生成' : '确认，继续'}
           </button>
+        </div>
+      )}
+
+      {/* 驳回确认 */}
+      {!editing && showRejectConfirm && (
+        <div className="py-4 text-center space-y-3">
+          <p className="text-sm text-red-600">确认驳回并重新生成{stageTitle[stage]}？</p>
+          <div className="flex items-center justify-center gap-3">
+            <button
+              className="text-sm text-gray-500 border border-gray-300 px-5 py-2 rounded-lg hover:bg-gray-50"
+              onClick={() => setShowRejectConfirm(false)}
+            >
+              取消
+            </button>
+            <button
+              className="text-sm text-white bg-red-500 font-medium px-5 py-2 rounded-lg hover:bg-red-600 disabled:opacity-50"
+              onClick={onReject}
+              disabled={loading}
+            >
+              {loading ? '处理中...' : '确认驳回'}
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -412,13 +537,13 @@ function WorldPreview({ data }: { data: NonNullable<ProjectDetail['worldBuilding
     <section className="bg-white rounded-lg border p-5">
       <h3 className="font-semibold mb-3">世界观</h3>
       <p className="text-sm text-gray-600 mb-3">{data.synopsis}</p>
-      <div className="grid grid-cols-2 gap-3 text-xs">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
         <div><span className="text-gray-400">时代:</span> {data.era}</div>
         <div><span className="text-gray-400">基调:</span> {data.tone}</div>
         <div><span className="text-gray-400">背景:</span> {data.setting}</div>
-        <div className="col-span-2"><span className="text-gray-400">主题:</span> {data.themes.join('、')}</div>
+        <div className="sm:col-span-2"><span className="text-gray-400">主题:</span> {data.themes.join('、')}</div>
         {data.rules.length > 0 && (
-          <div className="col-span-2"><span className="text-gray-400">规则:</span> {data.rules.join('、')}</div>
+          <div className="sm:col-span-2"><span className="text-gray-400">规则:</span> {data.rules.join('、')}</div>
         )}
       </div>
     </section>
@@ -488,7 +613,7 @@ function WorldEditor({
   return (
     <section className="bg-white rounded-lg border p-5 space-y-3">
       <h3 className="font-semibold">编辑世界观</h3>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label className={labelClass}>时代</label>
           <input className={inputClass} value={form.era} onChange={(e) => set('era', e.target.value)} />
@@ -559,7 +684,7 @@ function CharacterEditor({
           </button>
           {expandedId === c.id && (
             <div className="mt-3 space-y-2">
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
                   <label className={labelClass}>名字</label>
                   <input className={inputClass} value={c.name} onChange={(e) => updateChar(c.id, 'name', e.target.value)} />
@@ -851,10 +976,14 @@ function CompleteView({
   project,
   selectedChapter,
   onSelectChapter,
+  feedbackData,
+  onFeedback,
 }: {
   project: ProjectDetail;
   selectedChapter: number;
   onSelectChapter: (n: number) => void;
+  feedbackData: FeedbackRecord[];
+  onFeedback: (targetType: string, targetId: string, rating: 'satisfied' | 'unsatisfied') => void;
 }) {
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>('chapters');
   const chapter = project.chapters.find((c) => c.number === selectedChapter);
@@ -863,10 +992,10 @@ function CompleteView({
     `text-xs px-2 py-1 rounded ${sidebarTab === tab ? 'bg-blue-100 text-blue-700 font-medium' : 'text-gray-500 hover:bg-gray-100'}`;
 
   return (
-    <div className="flex gap-6">
+    <div className="flex flex-col lg:flex-row gap-6">
       {/* 左侧导航面板 */}
-      <nav className="w-56 shrink-0">
-        <div className="bg-white rounded-lg border p-3 sticky top-6">
+      <nav className="w-full lg:w-56 shrink-0">
+        <div className="bg-white rounded-lg border p-3 lg:sticky lg:top-6">
           {/* Tab 切换 */}
           <div className="flex gap-1 mb-3 pb-2 border-b">
             <button className={tabClass('chapters')} onClick={() => setSidebarTab('chapters')}>章节</button>
@@ -977,11 +1106,131 @@ function CompleteView({
             <div className="prose prose-sm max-w-none whitespace-pre-wrap text-gray-800 leading-relaxed">
               {chapter.content}
             </div>
+            <div className="mt-6 pt-4 border-t">
+              <FeedbackButtons
+                currentRating={feedbackData.find((f) => f.targetType === 'chapter' && f.targetId === String(chapter.number))?.rating}
+                onRate={(rating) => onFeedback('chapter', String(chapter.number), rating)}
+              />
+            </div>
           </>
         ) : (
           <p className="text-gray-400">选择一个章节开始阅读</p>
         )}
       </main>
+    </div>
+  );
+}
+
+// ─── 反馈按钮 ───
+
+function FeedbackButtons({
+  currentRating,
+  onRate,
+}: {
+  currentRating?: string;
+  onRate: (rating: 'satisfied' | 'unsatisfied') => void;
+}) {
+  return (
+    <div className="flex items-center justify-center gap-3 py-2">
+      <span className="text-xs text-gray-400">对这个结果满意吗？</span>
+      <button
+        className={`p-1.5 rounded-md transition-colors ${currentRating === 'satisfied' ? 'bg-green-100 text-green-600' : 'text-gray-300 hover:text-green-500 hover:bg-green-50'}`}
+        onClick={() => onRate('satisfied')}
+        title="满意"
+      >
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5" />
+        </svg>
+      </button>
+      <button
+        className={`p-1.5 rounded-md transition-colors ${currentRating === 'unsatisfied' ? 'bg-red-100 text-red-600' : 'text-gray-300 hover:text-red-500 hover:bg-red-50'}`}
+        onClick={() => onRate('unsatisfied')}
+        title="不满意"
+      >
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.736 3h4.018a2 2 0 01.485.06l3.76.94m-7 10v5a2 2 0 002 2h.096c.5 0 .905-.405.905-.904 0-.715.211-1.413.608-2.008L17 13V4m-7 10h2m5-10h2a2 2 0 012 2v6a2 2 0 01-2 2h-2.5" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
+// ─── Token 用量面板 ───
+
+const STAGE_NAME_MAP: Record<string, string> = {
+  input: '输入分析',
+  clarify: '追问生成',
+  refine: '回答完善',
+  world_building: '世界观',
+  character_design: '角色设计',
+  outline: '大纲',
+};
+
+function formatStage(stage: string): string {
+  if (STAGE_NAME_MAP[stage]) return STAGE_NAME_MAP[stage];
+  if (stage.startsWith('chapter_')) return `第 ${stage.split('_')[1]} 章`;
+  if (stage.startsWith('summary_')) return `摘要 ${stage.split('_')[1]}`;
+  if (stage.startsWith('compress_')) return `压缩 ${stage.split('_')[1]}`;
+  return stage;
+}
+
+function UsagePanel({ data }: { data: UsageSummary }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="mt-8 bg-white rounded-lg border">
+      <button
+        className="w-full px-5 py-3 flex items-center justify-between text-left"
+        onClick={() => setOpen(!open)}
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-gray-700">Token 用量</span>
+          <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded">
+            {data.total.totalTokens.toLocaleString()} tokens / {data.total.calls} 次调用
+          </span>
+        </div>
+        <svg
+          className={`w-4 h-4 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`}
+          fill="none" stroke="currentColor" viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="px-5 pb-4 border-t">
+          <table className="w-full text-xs mt-3">
+            <thead>
+              <tr className="text-gray-400 border-b">
+                <th className="text-left py-2 font-medium">阶段</th>
+                <th className="text-left py-2 font-medium">模型</th>
+                <th className="text-right py-2 font-medium">Prompt</th>
+                <th className="text-right py-2 font-medium">Completion</th>
+                <th className="text-right py-2 font-medium">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.stages.map((s) => (
+                <tr key={s.stage} className="border-b border-gray-50">
+                  <td className="py-2 text-gray-700">{formatStage(s.stage)}</td>
+                  <td className="py-2 text-gray-400 font-mono">{s.model.split('/').pop()}</td>
+                  <td className="py-2 text-right text-gray-600">{s.promptTokens.toLocaleString()}</td>
+                  <td className="py-2 text-right text-gray-600">{s.completionTokens.toLocaleString()}</td>
+                  <td className="py-2 text-right font-medium text-gray-800">{s.totalTokens.toLocaleString()}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="border-t font-medium">
+                <td className="py-2 text-gray-800" colSpan={2}>Total</td>
+                <td className="py-2 text-right text-gray-800">{data.total.promptTokens.toLocaleString()}</td>
+                <td className="py-2 text-right text-gray-800">{data.total.completionTokens.toLocaleString()}</td>
+                <td className="py-2 text-right text-gray-900">{data.total.totalTokens.toLocaleString()}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

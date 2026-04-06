@@ -8,6 +8,7 @@ import type { InputAnalysis } from '../../pipeline/agents/input-agent.js';
 import type { SSEEvent } from '../../types/pipeline.js';
 import type { PipelineStatus } from '../../types/project.js';
 import { getModelConfig, getPrompt } from '../../config/index.js';
+import { saveTokenUsage } from '../../db/usage.js';
 
 const app = new Hono();
 
@@ -27,6 +28,7 @@ async function getModels(): Promise<PipelineModelConfig> {
 
 function makeSseCallbacks(
   write: (event: string, data: string) => Promise<void>,
+  projectId: string,
 ): PipelineCallbacks {
   const send = async (event: SSEEvent) => {
     await write(event.type, JSON.stringify(event));
@@ -41,6 +43,10 @@ function makeSseCallbacks(
     onChapterComplete: (num) => { send({ type: 'chapter_complete', chapterNumber: num }); },
     onClarifyQuestions: (questions) => { send({ type: 'clarify_questions', questions }); },
     onError: (err) => { send({ type: 'error', message: err.message }); },
+    onUsage: (stage, model, usage) => {
+      send({ type: 'usage', stage, model, ...usage });
+      saveTokenUsage(projectId, stage, model, usage).catch(() => {});
+    },
   };
 }
 
@@ -108,11 +114,11 @@ app.get('/:id/stream', async (c) => {
         engine = await PipelineEngine.create(
           project.userPrompt,
           await getModels(),
-          makeSseCallbacks(write),
+          makeSseCallbacks(write, id),
           { persist: true, projectId: id },
         );
       } else {
-        engine = await PipelineEngine.resume(id, await getModels(), makeSseCallbacks(write));
+        engine = await PipelineEngine.resume(id, await getModels(), makeSseCallbacks(write, id));
       }
 
       await engine.run();
@@ -279,7 +285,7 @@ app.get('/:id/stream/generate', async (c) => {
     }, 15_000);
 
     try {
-      const engine = await PipelineEngine.resume(id, await getModels(), makeSseCallbacks(write));
+      const engine = await PipelineEngine.resume(id, await getModels(), makeSseCallbacks(write, id));
       activeEngines.set(id, engine);
 
       if (project.status === 'paused') {

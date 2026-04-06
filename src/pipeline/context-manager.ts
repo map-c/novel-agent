@@ -1,5 +1,5 @@
 import { callLLM } from '../llm/index.js';
-import type { LLMConfig } from '../types/llm.js';
+import type { LLMConfig, TokenUsage } from '../types/llm.js';
 import type { WorldBuilding, Character, ChapterOutline } from '../types/project.js';
 import type { PipelineState } from '../types/pipeline.js';
 import { DEFAULT_PROMPTS } from '../config/defaults.js';
@@ -43,12 +43,14 @@ export class ContextManager {
   /** 可选的提示词覆盖 */
   private summaryPrompt: string;
   private compressPrompt: string;
+  private onUsage?: (stage: string, usage: TokenUsage) => void;
 
   constructor(
     private state: PipelineState,
     private strongConfig: LLMConfig,
     summaryConfig?: LLMConfig,
     prompts?: { summary?: string; compress?: string },
+    onUsage?: (stage: string, usage: TokenUsage) => void,
   ) {
     this.summaryConfig = summaryConfig ?? {
       model: 'google/gemini-2.0-flash-001',
@@ -57,6 +59,7 @@ export class ContextManager {
     };
     this.summaryPrompt = prompts?.summary ?? DEFAULT_PROMPTS['summary'];
     this.compressPrompt = prompts?.compress ?? DEFAULT_PROMPTS['compress'];
+    this.onUsage = onUsage;
   }
 
   /** 从持久化数据恢复内部状态（用于中断恢复） */
@@ -149,7 +152,7 @@ export class ContextManager {
    * 生成单章摘要（~300 字）
    */
   private async generateChapterSummary(chapterNumber: number, content: string): Promise<string> {
-    const { text } = await callLLM(
+    const { text, usage } = await callLLM(
       `请为以下章节内容写一段简要摘要（200-300字），重点记录：
 1. 关键事件和情节推进
 2. 角色的重要行为和态度变化
@@ -160,6 +163,7 @@ ${content}`,
       this.summaryConfig,
       this.summaryPrompt,
     );
+    if (usage) this.onUsage?.(`summary_${chapterNumber}`, usage as TokenUsage);
     return text;
   }
 
@@ -173,7 +177,7 @@ ${content}`,
       return newChapterSummary;
     }
 
-    const { text } = await callLLM(
+    const { text, usage } = await callLLM(
       `已有的情节总摘要（截止到第 ${chapterNumber - 1} 章）：
 ${this.plotSummary}
 
@@ -188,6 +192,7 @@ ${newChapterSummary}
       this.summaryConfig,
       this.compressPrompt,
     );
+    if (usage) this.onUsage?.(`compress_${chapterNumber}`, usage as TokenUsage);
     return text;
   }
 

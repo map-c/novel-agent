@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { callLLMStructured } from '../../llm/index.js';
-import type { LLMConfig } from '../../types/llm.js';
+import type { LLMConfig, TokenUsage } from '../../types/llm.js';
 import type { InputAnalysis } from './input-agent.js';
 import { inputAnalysisSchema } from './input-agent.js';
 import { DEFAULT_PROMPTS } from '../../config/defaults.js';
@@ -17,6 +17,7 @@ export async function runClarifyAgent(
   analysis: InputAnalysis,
   config: LLMConfig,
   systemPrompt?: string,
+  onUsage?: (usage: TokenUsage) => void,
 ): Promise<string[]> {
   const prompt = `以下是对用户创作想法的初步分析：
 
@@ -30,7 +31,8 @@ export async function runClarifyAgent(
 请提出 1-3 个关键问题，帮助进一步明确故事方向。`;
 
   const system = systemPrompt ?? DEFAULT_PROMPTS['clarify'];
-  const { object } = await callLLMStructured(prompt, config, clarifyQuestionsSchema, system);
+  const { object, usage } = await callLLMStructured(prompt, config, clarifyQuestionsSchema, system);
+  if (usage) onUsage?.(usage as TokenUsage);
   return object.questions;
 }
 
@@ -42,6 +44,7 @@ export async function runRefineAgent(
   answers: { question: string; answer: string }[],
   config: LLMConfig,
   systemPrompt?: string,
+  onUsage?: (usage: TokenUsage) => void,
 ): Promise<InputAnalysis> {
   const qaText = answers
     .map((a, i) => `问题 ${i + 1}：${a.question}\n回答：${a.answer}`)
@@ -61,6 +64,7 @@ ${qaText}
 请根据用户的回答，输出完善后的分析。`;
 
   const system = systemPrompt ?? DEFAULT_PROMPTS['refine'];
-  const { object } = await callLLMStructured(prompt, config, inputAnalysisSchema, system);
+  const { object, usage } = await callLLMStructured(prompt, config, inputAnalysisSchema, system);
+  if (usage) onUsage?.(usage as TokenUsage);
   return object;
 }

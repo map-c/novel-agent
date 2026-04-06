@@ -45,6 +45,26 @@ export const settings = sqliteTable('settings', {
   updatedAt: text('updated_at').notNull(),
 });
 
+export const tokenUsage = sqliteTable('token_usage', {
+  id: text('id').primaryKey(),
+  projectId: text('project_id').notNull().references(() => projects.id),
+  stage: text('stage').notNull(),
+  model: text('model').notNull(),
+  promptTokens: integer('prompt_tokens').notNull().default(0),
+  completionTokens: integer('completion_tokens').notNull().default(0),
+  totalTokens: integer('total_tokens').notNull().default(0),
+  createdAt: text('created_at').notNull(),
+});
+
+export const feedback = sqliteTable('feedback', {
+  id: text('id').primaryKey(),
+  projectId: text('project_id').notNull().references(() => projects.id),
+  targetType: text('target_type').notNull(),
+  targetId: text('target_id').notNull().default(''),
+  rating: text('rating').notNull(),
+  createdAt: text('created_at').notNull(),
+});
+
 export const chapters = sqliteTable('chapters', {
   id: text('id').primaryKey(),
   projectId: text('project_id').notNull().references(() => projects.id),

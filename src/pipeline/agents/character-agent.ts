@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { streamLLMStructured } from '../../llm/index.js';
-import type { LLMConfig } from '../../types/llm.js';
+import type { LLMConfig, TokenUsage } from '../../types/llm.js';
 import type { InputAnalysis } from './input-agent.js';
 import type { WorldBuildingResult } from './world-agent.js';
 import { DEFAULT_PROMPTS } from '../../config/defaults.js';
@@ -33,6 +33,7 @@ export async function runCharacterAgent(
   config: LLMConfig,
   onChunk?: (chunk: string) => void,
   systemPrompt?: string,
+  onUsage?: (usage: TokenUsage) => void,
 ): Promise<CharacterDesignResult> {
   const prompt = `故事信息：
 - 标题：${input.title}
@@ -48,6 +49,7 @@ export async function runCharacterAgent(
 请设计一组角色及他们之间的关系。`;
 
   const system = systemPrompt ?? DEFAULT_PROMPTS['character'];
-  const { object } = await streamLLMStructured(prompt, config, charactersSchema, system, onChunk);
+  const { object, usage } = await streamLLMStructured(prompt, config, charactersSchema, system, onChunk);
+  if (usage) onUsage?.(usage as TokenUsage);
   return object;
 }

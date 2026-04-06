@@ -4,11 +4,16 @@ import { listProjects, createProject, deleteProject, type ProjectSummary } from 
 
 const STATUS_LABELS: Record<string, string> = {
   input: '待启动',
+  clarifying: '补充信息',
   world_building: '构建世界观',
   character_design: '设计角色',
   outline: '生成大纲',
+  review_world: '确认世界观',
+  review_characters: '确认角色',
+  review_outline: '确认大纲',
   review: '待审阅',
   generating: '生成中',
+  paused: '已暂停',
   complete: '已完成',
 };
 
@@ -16,24 +21,41 @@ export default function Home() {
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [prompt, setPrompt] = useState('');
   const [creating, setCreating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  const load = () => listProjects().then(setProjects);
+  const load = () => listProjects().then(setProjects).catch(() => {});
 
   useEffect(() => { load(); }, []);
 
   const handleCreate = async () => {
     if (!prompt.trim()) return;
     setCreating(true);
-    const { id } = await createProject(prompt.trim());
-    setPrompt('');
-    setCreating(false);
-    navigate(`/project/${id}`);
+    setError(null);
+    try {
+      const { id } = await createProject(prompt.trim());
+      setPrompt('');
+      navigate(`/project/${id}`);
+    } catch (err) {
+      setError((err as Error).message || '创建失败，请重试');
+    } finally {
+      setCreating(false);
+    }
   };
 
   const handleDelete = async (id: string) => {
-    await deleteProject(id);
-    load();
+    setDeleting(id);
+    try {
+      await deleteProject(id);
+      setConfirmDelete(null);
+      load();
+    } catch {
+      setError('删除失败，请重试');
+    } finally {
+      setDeleting(null);
+    }
   };
 
   return (
@@ -53,6 +75,18 @@ export default function Home() {
           </button>
         </div>
         <p className="text-gray-500 mb-8">AI 小说生成工作台</p>
+
+        {/* 全局错误提示 */}
+        {error && (
+          <div className="mb-4 bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-lg flex items-center justify-between">
+            <span>{error}</span>
+            <button onClick={() => setError(null)} className="text-red-400 hover:text-red-600 ml-2">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        )}
 
         {/* 新建项目 */}
         <div className="bg-white rounded-lg shadow-sm border p-6 mb-8">
@@ -85,23 +119,46 @@ export default function Home() {
               {projects.map((p) => (
                 <div
                   key={p.id}
-                  className="bg-white rounded-lg border p-4 flex items-center justify-between hover:shadow-sm cursor-pointer"
-                  onClick={() => navigate(`/project/${p.id}`)}
+                  className="bg-white rounded-lg border p-4 hover:shadow-sm cursor-pointer"
+                  onClick={() => confirmDelete !== p.id && navigate(`/project/${p.id}`)}
                 >
-                  <div>
-                    <div className="font-medium text-gray-900">{p.title}</div>
-                    <div className="text-xs text-gray-400 mt-1">
-                      {STATUS_LABELS[p.status] ?? p.status}
-                      {' · '}
-                      {new Date(p.createdAt).toLocaleDateString()}
+                  <div className="flex items-center justify-between">
+                    <div className="min-w-0">
+                      <div className="font-medium text-gray-900 truncate">{p.title}</div>
+                      <div className="text-xs text-gray-400 mt-1">
+                        {STATUS_LABELS[p.status] ?? p.status}
+                        {' · '}
+                        {new Date(p.createdAt).toLocaleDateString()}
+                      </div>
                     </div>
+                    {confirmDelete !== p.id && (
+                      <button
+                        className="text-gray-400 hover:text-red-500 text-sm px-2 shrink-0"
+                        onClick={(e) => { e.stopPropagation(); setConfirmDelete(p.id); }}
+                      >
+                        删除
+                      </button>
+                    )}
                   </div>
-                  <button
-                    className="text-gray-400 hover:text-red-500 text-sm px-2"
-                    onClick={(e) => { e.stopPropagation(); handleDelete(p.id); }}
-                  >
-                    删除
-                  </button>
+                  {confirmDelete === p.id && (
+                    <div className="flex items-center gap-2 mt-3 pt-3 border-t" onClick={(e) => e.stopPropagation()}>
+                      <span className="text-xs text-red-500">确认删除该项目？</span>
+                      <div className="flex-1" />
+                      <button
+                        className="text-xs text-gray-500 px-3 py-1.5 hover:bg-gray-100 rounded"
+                        onClick={() => setConfirmDelete(null)}
+                      >
+                        取消
+                      </button>
+                      <button
+                        className="text-xs text-white bg-red-500 font-medium px-3 py-1.5 rounded hover:bg-red-600 disabled:opacity-50"
+                        onClick={() => handleDelete(p.id)}
+                        disabled={deleting === p.id}
+                      >
+                        {deleting === p.id ? '删除中...' : '删除'}
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

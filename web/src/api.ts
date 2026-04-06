@@ -182,3 +182,52 @@ export async function applyPreset(name: string): Promise<void> {
     body: JSON.stringify({ name }),
   });
 }
+
+// ─── Usage & Feedback API ───
+
+export interface UsageSummary {
+  stages: {
+    stage: string;
+    model: string;
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+    calls: number;
+  }[];
+  total: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+    calls: number;
+  };
+}
+
+export interface FeedbackRecord {
+  id: string;
+  projectId: string;
+  targetType: string;
+  targetId: string;
+  rating: string;
+  createdAt: string;
+}
+
+export async function getUsage(id: string): Promise<UsageSummary> {
+  return fetchJSON(`${BASE}/projects/${id}/usage`);
+}
+
+export async function getFeedback(id: string): Promise<FeedbackRecord[]> {
+  return fetchJSON(`${BASE}/projects/${id}/feedback`);
+}
+
+export async function submitFeedback(
+  id: string,
+  targetType: string,
+  targetId: string,
+  rating: 'satisfied' | 'unsatisfied',
+): Promise<void> {
+  await fetchJSON(`${BASE}/projects/${id}/feedback`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ targetType, targetId, rating }),
+  });
+}

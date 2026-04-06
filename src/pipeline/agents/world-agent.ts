@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { callLLMStructured } from '../../llm/index.js';
-import type { LLMConfig } from '../../types/llm.js';
+import type { LLMConfig, TokenUsage } from '../../types/llm.js';
 import type { InputAnalysis } from './input-agent.js';
 import { DEFAULT_PROMPTS } from '../../config/defaults.js';
 
@@ -19,6 +19,7 @@ export async function runWorldAgent(
   input: InputAnalysis,
   config: LLMConfig,
   systemPrompt?: string,
+  onUsage?: (usage: TokenUsage) => void,
 ): Promise<WorldBuildingResult> {
   const prompt = `故事信息：
 - 标题：${input.title}
@@ -30,6 +31,7 @@ export async function runWorldAgent(
 请基于以上信息构建完整的世界观设定。`;
 
   const system = systemPrompt ?? DEFAULT_PROMPTS['world'];
-  const { object } = await callLLMStructured(prompt, config, worldBuildingSchema, system);
+  const { object, usage } = await callLLMStructured(prompt, config, worldBuildingSchema, system);
+  if (usage) onUsage?.(usage as TokenUsage);
   return object;
 }

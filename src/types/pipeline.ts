@@ -21,5 +21,6 @@ export type SSEEvent =
   | { type: 'chapter_complete'; chapterNumber: number }
   | { type: 'review_ready'; stage: string; data: unknown }
   | { type: 'clarify_questions'; questions: string[] }
+  | { type: 'usage'; stage: string; model: string; promptTokens: number; completionTokens: number; totalTokens: number }
   | { type: 'error'; message: string }
   | { type: 'complete' };

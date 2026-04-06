@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { streamLLMStructured } from '../../llm/index.js';
-import type { LLMConfig } from '../../types/llm.js';
+import type { LLMConfig, TokenUsage } from '../../types/llm.js';
 import type { InputAnalysis } from './input-agent.js';
 import type { WorldBuildingResult } from './world-agent.js';
 import type { CharacterDesignResult } from './character-agent.js';
@@ -37,6 +37,7 @@ export async function runOutlineAgent(
   config: LLMConfig,
   onChunk?: (chunk: string) => void,
   systemPrompt?: string,
+  onUsage?: (usage: TokenUsage) => void,
 ): Promise<PlotOutlineResult> {
   const characterSummary = characters.characters
     .map((c) => `- ${c.name}（${c.role}）：${c.description}。动机：${c.motivations.join('、')}`)
@@ -66,6 +67,7 @@ ${relationshipSummary}
 请设计完整的章节大纲，使用三幕结构。`;
 
   const system = systemPrompt ?? DEFAULT_PROMPTS['outline'];
-  const { object } = await streamLLMStructured(prompt, config, plotOutlineSchema, system, onChunk);
+  const { object, usage } = await streamLLMStructured(prompt, config, plotOutlineSchema, system, onChunk);
+  if (usage) onUsage?.(usage as TokenUsage);
   return object;
 }

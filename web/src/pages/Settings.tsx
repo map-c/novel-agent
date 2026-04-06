@@ -4,10 +4,12 @@ import {
   getPrompts, updatePrompt, resetPrompt,
   getModelsConfig, updateModelConfig, resetModelConfig,
   getPresets, applyPreset,
+  listProjects, getUsage, getFeedback,
   type PromptInfo, type ModelInfo, type PresetInfo,
+  type ProjectSummary, type UsageSummary, type FeedbackRecord,
 } from '../api';
 
-type Tab = 'models' | 'prompts' | 'presets';
+type Tab = 'models' | 'prompts' | 'presets' | 'stats';
 
 function Toast({ message, onClose }: { message: string; onClose: () => void }) {
   useEffect(() => {
@@ -62,6 +64,7 @@ export default function Settings() {
             ['models', '模型配置'],
             ['prompts', '提示词管理'],
             ['presets', '生成预设'],
+            ['stats', '用量统计'],
           ] as [Tab, string][]).map(([key, label]) => (
             <button
               key={key}
@@ -79,6 +82,7 @@ export default function Settings() {
         {tab === 'models' && <ModelsTab showToast={showToast} />}
         {tab === 'prompts' && <PromptsTab showToast={showToast} />}
         {tab === 'presets' && <PresetsTab showToast={showToast} />}
+        {tab === 'stats' && <StatsTab />}
       </div>
 
       {toast && <Toast message={toast} onClose={() => setToast(null)} />}
@@ -370,6 +374,239 @@ function PresetsTab({ showToast }: { showToast: (msg: string) => void }) {
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+// ─── Stats Tab ───
+
+const STAGE_NAME_MAP: Record<string, string> = {
+  input: '输入分析',
+  clarify: '追问生成',
+  refine: '回答完善',
+  world_building: '世界观',
+  character_design: '角色设计',
+  outline: '大纲',
+};
+
+function formatStage(stage: string): string {
+  if (STAGE_NAME_MAP[stage]) return STAGE_NAME_MAP[stage];
+  if (stage.startsWith('chapter_')) return `第 ${stage.split('_')[1]} 章`;
+  if (stage.startsWith('summary_')) return `摘要 ${stage.split('_')[1]}`;
+  if (stage.startsWith('compress_')) return `压缩 ${stage.split('_')[1]}`;
+  return stage;
+}
+
+const RATING_LABELS: Record<string, { text: string; color: string }> = {
+  satisfied: { text: '满意', color: 'text-green-600 bg-green-50' },
+  unsatisfied: { text: '不满意', color: 'text-red-600 bg-red-50' },
+};
+
+const TARGET_LABELS: Record<string, string> = {
+  world: '世界观',
+  characters: '角色设计',
+  outline: '大纲',
+  chapter: '章节',
+};
+
+function StatsTab() {
+  const [projects, setProjects] = useState<ProjectSummary[]>([]);
+  const [selectedId, setSelectedId] = useState<string>('');
+  const [usage, setUsage] = useState<UsageSummary | null>(null);
+  const [feedback, setFeedback] = useState<FeedbackRecord[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [globalStats, setGlobalStats] = useState<{ totalTokens: number; totalCalls: number; projectCount: number; feedbackCount: number; satisfiedCount: number } | null>(null);
+
+  useEffect(() => {
+    listProjects().then(async (ps) => {
+      setProjects(ps);
+      if (ps.length > 0) setSelectedId(ps[0].id);
+      // 加载全局汇总
+      const allData = await Promise.all(ps.map(async (p) => {
+        const [u, f] = await Promise.all([getUsage(p.id), getFeedback(p.id)]);
+        return { usage: u, feedback: f };
+      }));
+      const totalTokens = allData.reduce((s, d) => s + d.usage.total.totalTokens, 0);
+      const totalCalls = allData.reduce((s, d) => s + d.usage.total.calls, 0);
+      const allFeedback = allData.flatMap((d) => d.feedback);
+      setGlobalStats({
+        totalTokens,
+        totalCalls,
+        projectCount: ps.length,
+        feedbackCount: allFeedback.length,
+        satisfiedCount: allFeedback.filter((f) => f.rating === 'satisfied').length,
+      });
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!selectedId) return;
+    setLoading(true);
+    Promise.all([getUsage(selectedId), getFeedback(selectedId)])
+      .then(([u, f]) => { setUsage(u); setFeedback(f); })
+      .finally(() => setLoading(false));
+  }, [selectedId]);
+
+  return (
+    <div className="space-y-6">
+      {/* 全局汇总 */}
+      {globalStats && (
+        <div className="bg-white rounded-lg border p-5">
+          <h3 className="font-semibold text-gray-900 text-sm mb-3">全局汇总</h3>
+          <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
+            <div className="bg-blue-50 rounded-lg p-3 text-center">
+              <div className="text-lg font-bold text-blue-700">{globalStats.totalTokens.toLocaleString()}</div>
+              <div className="text-xs text-blue-500">总 Tokens</div>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-3 text-center">
+              <div className="text-lg font-bold text-gray-700">{globalStats.totalCalls}</div>
+              <div className="text-xs text-gray-500">总调用次数</div>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-3 text-center">
+              <div className="text-lg font-bold text-gray-700">{globalStats.projectCount}</div>
+              <div className="text-xs text-gray-500">项目数</div>
+            </div>
+            <div className="bg-green-50 rounded-lg p-3 text-center">
+              <div className="text-lg font-bold text-green-700">{globalStats.satisfiedCount}</div>
+              <div className="text-xs text-green-500">满意</div>
+            </div>
+            <div className="bg-red-50 rounded-lg p-3 text-center">
+              <div className="text-lg font-bold text-red-700">{globalStats.feedbackCount - globalStats.satisfiedCount}</div>
+              <div className="text-xs text-red-500">不满意</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 项目选择器 */}
+      <div>
+        <label className="block text-xs text-gray-500 mb-1">选择项目查看详情</label>
+        <select
+          className="w-full border rounded-lg px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          value={selectedId}
+          onChange={(e) => setSelectedId(e.target.value)}
+        >
+          {projects.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.title} — {p.status}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {loading && <div className="text-gray-400 text-center py-8">加载中...</div>}
+
+      {!loading && usage && (
+        <>
+          {/* Token 用量 */}
+          <div className="bg-white rounded-lg border">
+            <div className="px-5 py-4 border-b">
+              <h3 className="font-semibold text-gray-900 text-sm">Token 用量</h3>
+            </div>
+
+            {usage.total.calls === 0 ? (
+              <div className="px-5 py-8 text-center text-sm text-gray-400">
+                该项目暂无用量数据
+              </div>
+            ) : (
+              <div className="px-5 py-3">
+                {/* 汇总卡片 */}
+                <div className="grid grid-cols-4 gap-3 mb-4">
+                  <div className="bg-blue-50 rounded-lg p-3 text-center">
+                    <div className="text-lg font-bold text-blue-700">{usage.total.totalTokens.toLocaleString()}</div>
+                    <div className="text-xs text-blue-500">总 Tokens</div>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-3 text-center">
+                    <div className="text-lg font-bold text-gray-700">{usage.total.promptTokens.toLocaleString()}</div>
+                    <div className="text-xs text-gray-500">Prompt</div>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-3 text-center">
+                    <div className="text-lg font-bold text-gray-700">{usage.total.completionTokens.toLocaleString()}</div>
+                    <div className="text-xs text-gray-500">Completion</div>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-3 text-center">
+                    <div className="text-lg font-bold text-gray-700">{usage.total.calls}</div>
+                    <div className="text-xs text-gray-500">调用次数</div>
+                  </div>
+                </div>
+
+                {/* 明细表 */}
+                <div className="overflow-x-auto">
+                <table className="w-full text-xs min-w-[500px]">
+                  <thead>
+                    <tr className="text-gray-400 border-b">
+                      <th className="text-left py-2 font-medium">阶段</th>
+                      <th className="text-left py-2 font-medium">模型</th>
+                      <th className="text-right py-2 font-medium">Prompt</th>
+                      <th className="text-right py-2 font-medium">Completion</th>
+                      <th className="text-right py-2 font-medium">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {usage.stages.map((s) => (
+                      <tr key={s.stage} className="border-b border-gray-50">
+                        <td className="py-2 text-gray-700">{formatStage(s.stage)}</td>
+                        <td className="py-2 text-gray-400 font-mono">{s.model.split('/').pop()}</td>
+                        <td className="py-2 text-right text-gray-600">{s.promptTokens.toLocaleString()}</td>
+                        <td className="py-2 text-right text-gray-600">{s.completionTokens.toLocaleString()}</td>
+                        <td className="py-2 text-right font-medium text-gray-800">{s.totalTokens.toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t font-medium">
+                      <td className="py-2 text-gray-800" colSpan={2}>合计</td>
+                      <td className="py-2 text-right text-gray-800">{usage.total.promptTokens.toLocaleString()}</td>
+                      <td className="py-2 text-right text-gray-800">{usage.total.completionTokens.toLocaleString()}</td>
+                      <td className="py-2 text-right text-gray-900">{usage.total.totalTokens.toLocaleString()}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* 用户反馈 */}
+          <div className="bg-white rounded-lg border">
+            <div className="px-5 py-4 border-b">
+              <h3 className="font-semibold text-gray-900 text-sm">用户反馈</h3>
+            </div>
+
+            {feedback.length === 0 ? (
+              <div className="px-5 py-8 text-center text-sm text-gray-400">
+                该项目暂无反馈
+              </div>
+            ) : (
+              <div className="px-5 py-3">
+                <div className="space-y-2">
+                  {feedback.map((f) => {
+                    const ratingInfo = RATING_LABELS[f.rating] ?? { text: f.rating, color: 'text-gray-600 bg-gray-50' };
+                    return (
+                      <div key={f.id} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-gray-700">
+                            {TARGET_LABELS[f.targetType] ?? f.targetType}
+                            {f.targetId && ` ${f.targetId}`}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className={`text-xs px-2 py-0.5 rounded ${ratingInfo.color}`}>
+                            {ratingInfo.text}
+                          </span>
+                          <span className="text-xs text-gray-300">
+                            {new Date(f.createdAt).toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }

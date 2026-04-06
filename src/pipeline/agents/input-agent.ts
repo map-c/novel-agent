@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { callLLMStructured } from '../../llm/index.js';
-import type { LLMConfig } from '../../types/llm.js';
+import type { LLMConfig, TokenUsage } from '../../types/llm.js';
 import { DEFAULT_PROMPTS } from '../../config/defaults.js';
 
 /** 输入分析 Agent 的输出 schema */
@@ -19,13 +19,15 @@ export async function runInputAgent(
   userPrompt: string,
   config: LLMConfig,
   systemPrompt?: string,
+  onUsage?: (usage: TokenUsage) => void,
 ): Promise<InputAnalysis> {
   const system = systemPrompt ?? DEFAULT_PROMPTS['input'];
-  const { object } = await callLLMStructured(
+  const { object, usage } = await callLLMStructured(
     `用户的创作想法：\n${userPrompt}`,
     config,
     inputAnalysisSchema,
     system,
   );
+  if (usage) onUsage?.(usage as TokenUsage);
   return object;
 }

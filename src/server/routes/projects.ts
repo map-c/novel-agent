@@ -1,6 +1,8 @@
 import { Hono } from 'hono';
 import { getDb } from '../../db/index.js';
 import * as db from '../../db/operations.js';
+import { getProjectUsage } from '../../db/usage.js';
+import { getProjectFeedback, saveFeedback } from '../../db/feedback.js';
 
 const app = new Hono();
 
@@ -71,6 +73,44 @@ app.get('/:id/export', async (c) => {
       'Content-Disposition': `attachment; filename="novel.md"`,
     },
   });
+});
+
+// ─── Token Usage ───
+
+app.get('/:id/usage', async (c) => {
+  getDb();
+  const id = c.req.param('id');
+  const usage = await getProjectUsage(id);
+  return c.json(usage);
+});
+
+// ─── Feedback ───
+
+app.get('/:id/feedback', async (c) => {
+  getDb();
+  const id = c.req.param('id');
+  const feedbackList = await getProjectFeedback(id);
+  return c.json(feedbackList);
+});
+
+app.post('/:id/feedback', async (c) => {
+  getDb();
+  const id = c.req.param('id');
+  const { targetType, targetId, rating } = await c.req.json<{
+    targetType: string;
+    targetId?: string;
+    rating: string;
+  }>();
+
+  if (!targetType || !rating) {
+    return c.json({ error: 'targetType and rating are required' }, 400);
+  }
+  if (!['satisfied', 'unsatisfied'].includes(rating)) {
+    return c.json({ error: 'rating must be "satisfied" or "unsatisfied"' }, 400);
+  }
+
+  await saveFeedback(id, targetType, targetId ?? '', rating);
+  return c.json({ ok: true });
 });
 
 export default app;

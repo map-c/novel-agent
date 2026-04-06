@@ -52,6 +52,26 @@ function initTables(client: ReturnType<typeof createClient>) {
       updated_at TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS token_usage (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL REFERENCES projects(id),
+      stage TEXT NOT NULL,
+      model TEXT NOT NULL,
+      prompt_tokens INTEGER NOT NULL DEFAULT 0,
+      completion_tokens INTEGER NOT NULL DEFAULT 0,
+      total_tokens INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS feedback (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL REFERENCES projects(id),
+      target_type TEXT NOT NULL,
+      target_id TEXT NOT NULL DEFAULT '',
+      rating TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS chapters (
       id TEXT PRIMARY KEY,
       project_id TEXT NOT NULL REFERENCES projects(id),

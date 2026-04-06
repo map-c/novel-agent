@@ -11,6 +11,7 @@ export function useSSE(
 ) {
   const [connected, setConnected] = useState(false);
   const [done, setDone] = useState(false);
+  const [retryExhausted, setRetryExhausted] = useState(false);
   const sourceRef = useRef<EventSource | null>(null);
   const onEventRef = useRef(onEvent);
   onEventRef.current = onEvent;
@@ -30,6 +31,7 @@ export function useSSE(
 
     closedByUsRef.current = false;
     setDone(false);
+    setRetryExhausted(false);
 
     let retryCount = 0;
     let retryTimer: ReturnType<typeof setTimeout>;
@@ -61,6 +63,7 @@ export function useSSE(
           retryTimer = setTimeout(connect, delay);
         } else {
           setDone(true);
+          setRetryExhausted(true);
         }
       };
 
@@ -72,6 +75,7 @@ export function useSSE(
         'clarify_questions',
         'chunk',
         'chapter_complete',
+        'usage',
         'error',
         'complete',
         'heartbeat',
@@ -108,5 +112,5 @@ export function useSSE(
     };
   }, [url]);
 
-  return { connected, done, close };
+  return { connected, done, retryExhausted, close };
 }
