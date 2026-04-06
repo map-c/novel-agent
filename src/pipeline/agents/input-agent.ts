@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { callLLMStructured } from '../../llm/index.js';
 import type { LLMConfig } from '../../types/llm.js';
+import { DEFAULT_PROMPTS } from '../../config/defaults.js';
 
 /** 输入分析 Agent 的输出 schema */
 export const inputAnalysisSchema = z.object({
@@ -14,21 +15,17 @@ export const inputAnalysisSchema = z.object({
 
 export type InputAnalysis = z.infer<typeof inputAnalysisSchema>;
 
-const SYSTEM = `你是一个小说策划专家。根据用户提供的创作想法，分析并提取关键要素。
-你需要：
-1. 判断体裁和基调
-2. 提炼核心主题
-3. 建议合适的章节数（短篇 3-5 章，中篇 8-15 章）
-4. 将用户的想法扩展为一个完整的故事梗概
-
-输出必须是结构化的 JSON。`;
-
-export async function runInputAgent(userPrompt: string, config: LLMConfig): Promise<InputAnalysis> {
+export async function runInputAgent(
+  userPrompt: string,
+  config: LLMConfig,
+  systemPrompt?: string,
+): Promise<InputAnalysis> {
+  const system = systemPrompt ?? DEFAULT_PROMPTS['input'];
   const { object } = await callLLMStructured(
     `用户的创作想法：\n${userPrompt}`,
     config,
     inputAnalysisSchema,
-    SYSTEM,
+    system,
   );
   return object;
 }

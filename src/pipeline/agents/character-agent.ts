@@ -1,8 +1,9 @@
 import { z } from 'zod';
-import { callLLMStructured } from '../../llm/index.js';
+import { streamLLMStructured } from '../../llm/index.js';
 import type { LLMConfig } from '../../types/llm.js';
 import type { InputAnalysis } from './input-agent.js';
 import type { WorldBuildingResult } from './world-agent.js';
+import { DEFAULT_PROMPTS } from '../../config/defaults.js';
 
 const characterSchema = z.object({
   name: z.string().describe('角色姓名'),
@@ -26,18 +27,12 @@ export const charactersSchema = z.object({
 
 export type CharacterDesignResult = z.infer<typeof charactersSchema>;
 
-const SYSTEM = `你是一个角色设计专家。基于故事梗概和世界观，设计一组鲜明、立体的角色。
-要求：
-1. 每个角色要有清晰的动机和成长弧线
-2. 角色之间要有冲突或互补的关系
-3. 角色的语言风格要有辨识度
-4. 至少包含一个主角和一个对手角色
-5. 角色设定必须与世界观规则一致`;
-
 export async function runCharacterAgent(
   input: InputAnalysis,
   world: WorldBuildingResult,
   config: LLMConfig,
+  onChunk?: (chunk: string) => void,
+  systemPrompt?: string,
 ): Promise<CharacterDesignResult> {
   const prompt = `故事信息：
 - 标题：${input.title}
@@ -52,6 +47,7 @@ export async function runCharacterAgent(
 
 请设计一组角色及他们之间的关系。`;
 
-  const { object } = await callLLMStructured(prompt, config, charactersSchema, SYSTEM);
+  const system = systemPrompt ?? DEFAULT_PROMPTS['character'];
+  const { object } = await streamLLMStructured(prompt, config, charactersSchema, system, onChunk);
   return object;
 }

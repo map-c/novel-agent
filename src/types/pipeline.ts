@@ -16,6 +16,7 @@ export interface PipelineState {
 
 export type SSEEvent =
   | { type: 'stage_changed'; stage: PipelineStatus }
+  | { type: 'stage_chunk'; stage: PipelineStatus; text: string }
   | { type: 'chunk'; chapterNumber: number; text: string }
   | { type: 'chapter_complete'; chapterNumber: number }
   | { type: 'review_ready'; stage: string; data: unknown }

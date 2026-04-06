@@ -67,6 +67,7 @@ export function useSSE(
       // 监听所有已知的事件类型
       const eventTypes = [
         'stage_changed',
+        'stage_chunk',
         'review_ready',
         'clarify_questions',
         'chunk',

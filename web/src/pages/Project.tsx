@@ -36,7 +36,9 @@ export default function Project() {
   const [selectedChapter, setSelectedChapter] = useState(1);
   const [actionLoading, setActionLoading] = useState(false);
   const [clarifyQuestions, setClarifyQuestions] = useState<string[]>([]);
+  const [stageStreamingText, setStageStreamingText] = useState('');
   const streamingRef = useRef('');
+  const stageStreamingRef = useRef('');
 
   // 加载项目
   const loadProject = useCallback(async () => {
@@ -68,10 +70,16 @@ export default function Project() {
     switch (event.type) {
       case 'stage_changed':
         setStage(event.stage as string);
+        stageStreamingRef.current = '';
+        setStageStreamingText('');
         if (event.stage === 'paused') {
           setSseUrl(null);
           loadProject();
         }
+        break;
+      case 'stage_chunk':
+        stageStreamingRef.current += event.text as string;
+        setStageStreamingText(stageStreamingRef.current);
         break;
       case 'clarify_questions':
         setClarifyQuestions(event.questions as string[]);
@@ -247,9 +255,17 @@ export default function Project() {
 
         {/* 处理中 */}
         {isProcessing && (
-          <div className="text-center py-20">
-            <div className="inline-block w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4" />
-            <p className="text-gray-600">{STAGE_LABELS[stage]}...</p>
+          <div className="py-10">
+            <div className="text-center mb-6">
+              <div className="inline-block w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4" />
+              <p className="text-gray-600">{STAGE_LABELS[stage]}...</p>
+            </div>
+            {stageStreamingText && (
+              <div className="bg-white rounded-lg border p-4 max-h-96 overflow-y-auto">
+                <p className="text-xs text-gray-400 mb-2">实时生成预览</p>
+                <pre className="text-sm text-gray-700 whitespace-pre-wrap font-mono leading-relaxed">{stageStreamingText}</pre>
+              </div>
+            )}
           </div>
         )}
 

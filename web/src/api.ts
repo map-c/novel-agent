@@ -117,3 +117,68 @@ export async function submitClarification(id: string, answers: string[]): Promis
     body: JSON.stringify({ answers }),
   });
 }
+
+// ─── Settings API ───
+
+export interface PromptInfo {
+  value: string;
+  isDefault: boolean;
+  label: string;
+  defaultValue: string;
+}
+
+export interface ModelInfo {
+  config: { model: string; temperature?: number; maxTokens?: number };
+  isDefault: boolean;
+  defaultConfig: { model: string; temperature?: number; maxTokens?: number };
+}
+
+export interface PresetInfo {
+  label: string;
+  description: string;
+  models: Record<string, { model: string; temperature?: number; maxTokens?: number }>;
+}
+
+export async function getPrompts(): Promise<Record<string, PromptInfo>> {
+  return fetchJSON(`${BASE}/settings/prompts`);
+}
+
+export async function updatePrompt(key: string, value: string): Promise<void> {
+  await fetchJSON(`${BASE}/settings/prompts/${key}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ value }),
+  });
+}
+
+export async function resetPrompt(key: string): Promise<{ ok: boolean; defaultValue: string }> {
+  return fetchJSON(`${BASE}/settings/prompts/${key}`, { method: 'DELETE' });
+}
+
+export async function getModelsConfig(): Promise<Record<string, ModelInfo>> {
+  return fetchJSON(`${BASE}/settings/models`);
+}
+
+export async function updateModelConfig(tier: string, config: { model: string; temperature?: number; maxTokens?: number }): Promise<void> {
+  await fetchJSON(`${BASE}/settings/models/${tier}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(config),
+  });
+}
+
+export async function resetModelConfig(tier: string): Promise<void> {
+  await fetchJSON(`${BASE}/settings/models/${tier}`, { method: 'DELETE' });
+}
+
+export async function getPresets(): Promise<Record<string, PresetInfo>> {
+  return fetchJSON(`${BASE}/settings/presets`);
+}
+
+export async function applyPreset(name: string): Promise<void> {
+  await fetchJSON(`${BASE}/settings/presets/apply`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name }),
+  });
+}

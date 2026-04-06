@@ -7,6 +7,7 @@ import { runRefineAgent } from '../../pipeline/agents/clarify-agent.js';
 import type { InputAnalysis } from '../../pipeline/agents/input-agent.js';
 import type { SSEEvent } from '../../types/pipeline.js';
 import type { PipelineStatus } from '../../types/project.js';
+import { getModelConfig, getPrompt } from '../../config/index.js';
 
 const app = new Hono();
 
@@ -20,12 +21,8 @@ const REVIEW_STATES: Set<PipelineStatus> = new Set([
 /** 活跃的生成引擎（用于暂停请求） */
 const activeEngines = new Map<string, PipelineEngine>();
 
-function getModels(): PipelineModelConfig {
-  return {
-    planning: { model: process.env.PLANNING_MODEL ?? 'google/gemini-2.0-flash-001', temperature: 0.7, maxTokens: 4000 },
-    writing:  { model: process.env.WRITING_MODEL  ?? 'google/gemini-2.0-flash-001', temperature: 0.8, maxTokens: 4000 },
-    summary:  { model: process.env.SUMMARY_MODEL  ?? 'google/gemini-2.0-flash-001', temperature: 0.3, maxTokens: 800 },
-  };
+async function getModels(): Promise<PipelineModelConfig> {
+  return getModelConfig();
 }
 
 function makeSseCallbacks(
@@ -36,6 +33,7 @@ function makeSseCallbacks(
   };
   return {
     onStageChange: (stage) => { send({ type: 'stage_changed', stage }); },
+    onStageChunk: (stage, text) => { send({ type: 'stage_chunk', stage, text }); },
     onReviewReady: (state) => {
       send({ type: 'review_ready', stage: state.status, data: null });
     },
@@ -109,12 +107,12 @@ app.get('/:id/stream', async (c) => {
       if (project.status === 'input') {
         engine = await PipelineEngine.create(
           project.userPrompt,
-          getModels(),
+          await getModels(),
           makeSseCallbacks(write),
           { persist: true, projectId: id },
         );
       } else {
-        engine = await PipelineEngine.resume(id, getModels(), makeSseCallbacks(write));
+        engine = await PipelineEngine.resume(id, await getModels(), makeSseCallbacks(write));
       }
 
       await engine.run();
@@ -221,7 +219,7 @@ app.post('/:id/clarify', async (c) => {
   // 用回答补充完善分析
   if (analysis) {
     const qa = questions.map((q: string, i: number) => ({ question: q, answer: answers[i] ?? '' }));
-    const refined = await runRefineAgent(analysis, qa, getModels().planning);
+    const refined = await runRefineAgent(analysis, qa, (await getModels()).planning, await getPrompt('refine'));
     await db.saveInputAnalysisData(id, refined.title, refined);
   }
 
@@ -281,7 +279,7 @@ app.get('/:id/stream/generate', async (c) => {
     }, 15_000);
 
     try {
-      const engine = await PipelineEngine.resume(id, getModels(), makeSseCallbacks(write));
+      const engine = await PipelineEngine.resume(id, await getModels(), makeSseCallbacks(write));
       activeEngines.set(id, engine);
 
       if (project.status === 'paused') {

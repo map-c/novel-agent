@@ -2,6 +2,7 @@ import { callLLM } from '../llm/index.js';
 import type { LLMConfig } from '../types/llm.js';
 import type { WorldBuilding, Character, ChapterOutline } from '../types/project.js';
 import type { PipelineState } from '../types/pipeline.js';
+import { DEFAULT_PROMPTS } from '../config/defaults.js';
 
 /**
  * 章节上下文 —— 喂给章节生成 Agent 的完整上下文
@@ -39,17 +40,23 @@ export class ContextManager {
   private chapterEndings: Map<number, string> = new Map();
   /** 用于生成摘要的弱模型配置 */
   private summaryConfig: LLMConfig;
+  /** 可选的提示词覆盖 */
+  private summaryPrompt: string;
+  private compressPrompt: string;
 
   constructor(
     private state: PipelineState,
     private strongConfig: LLMConfig,
     summaryConfig?: LLMConfig,
+    prompts?: { summary?: string; compress?: string },
   ) {
     this.summaryConfig = summaryConfig ?? {
       model: 'google/gemini-2.0-flash-001',
       temperature: 0.3,
       maxTokens: 800,
     };
+    this.summaryPrompt = prompts?.summary ?? DEFAULT_PROMPTS['summary'];
+    this.compressPrompt = prompts?.compress ?? DEFAULT_PROMPTS['compress'];
   }
 
   /** 从持久化数据恢复内部状态（用于中断恢复） */
@@ -151,7 +158,7 @@ export class ContextManager {
 第 ${chapterNumber} 章内容：
 ${content}`,
       this.summaryConfig,
-      '你是一个小说编辑助手，擅长提炼章节要点。输出纯文本摘要，不要用 markdown 格式。',
+      this.summaryPrompt,
     );
     return text;
   }
@@ -179,7 +186,7 @@ ${newChapterSummary}
 3. 突出最近的事件和当前的故事走向
 4. 保持时间线清晰`,
       this.summaryConfig,
-      '你是一个小说编辑助手，擅长压缩和整理故事脉络。输出纯文本摘要，不要用 markdown 格式。',
+      this.compressPrompt,
     );
     return text;
   }

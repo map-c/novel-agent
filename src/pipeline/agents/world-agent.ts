@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { callLLMStructured } from '../../llm/index.js';
 import type { LLMConfig } from '../../types/llm.js';
 import type { InputAnalysis } from './input-agent.js';
+import { DEFAULT_PROMPTS } from '../../config/defaults.js';
 
 export const worldBuildingSchema = z.object({
   era: z.string().describe('时代背景'),
@@ -14,14 +15,11 @@ export const worldBuildingSchema = z.object({
 
 export type WorldBuildingResult = z.infer<typeof worldBuildingSchema>;
 
-const SYSTEM = `你是一个世界观架构师。基于故事梗概和体裁信息，构建一个完整且自洽的世界观。
-要求：
-1. 世界观必须服务于故事主题
-2. 设定要具体、可感知，避免空泛描述
-3. 规则要清晰明确，为后续创作提供约束
-4. 基调与故事整体风格一致`;
-
-export async function runWorldAgent(input: InputAnalysis, config: LLMConfig): Promise<WorldBuildingResult> {
+export async function runWorldAgent(
+  input: InputAnalysis,
+  config: LLMConfig,
+  systemPrompt?: string,
+): Promise<WorldBuildingResult> {
   const prompt = `故事信息：
 - 标题：${input.title}
 - 体裁：${input.genre}
@@ -31,6 +29,7 @@ export async function runWorldAgent(input: InputAnalysis, config: LLMConfig): Pr
 
 请基于以上信息构建完整的世界观设定。`;
 
-  const { object } = await callLLMStructured(prompt, config, worldBuildingSchema, SYSTEM);
+  const system = systemPrompt ?? DEFAULT_PROMPTS['world'];
+  const { object } = await callLLMStructured(prompt, config, worldBuildingSchema, system);
   return object;
 }
