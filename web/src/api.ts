@@ -183,6 +183,12 @@ export async function applyPreset(name: string): Promise<void> {
   });
 }
 
+// ─── Inspiration API ───
+
+export async function getInspiration(): Promise<{ ideas: string[] }> {
+  return fetchJSON(`${BASE}/inspiration`, { method: 'POST' });
+}
+
 // ─── Usage & Feedback API ───
 
 export interface UsageSummary {

@@ -6,6 +6,7 @@ import 'dotenv/config';
 import projectRoutes from './routes/projects.js';
 import pipelineRoutes from './routes/pipeline.js';
 import settingsRoutes from './routes/settings.js';
+import inspirationRoutes from './routes/inspiration.js';
 
 const app = new Hono();
 
@@ -18,6 +19,7 @@ app.get('/api/health', (c) => {
 app.route('/api/projects', projectRoutes);
 app.route('/api/projects', pipelineRoutes);
 app.route('/api/settings', settingsRoutes);
+app.route('/api/inspiration', inspirationRoutes);
 
 const port = Number(process.env.PORT) || 3000;
 

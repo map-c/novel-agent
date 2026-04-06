@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { listProjects, createProject, deleteProject, type ProjectSummary } from '../api';
+import { listProjects, createProject, deleteProject, getInspiration, type ProjectSummary } from '../api';
 
 const STATUS_LABELS: Record<string, string> = {
   input: '待启动',
@@ -24,6 +24,8 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [inspirations, setInspirations] = useState<string[]>([]);
+  const [loadingIdeas, setLoadingIdeas] = useState(false);
   const navigate = useNavigate();
 
   const load = () => listProjects().then(setProjects).catch(() => {});
@@ -42,6 +44,19 @@ export default function Home() {
       setError((err as Error).message || '创建失败，请重试');
     } finally {
       setCreating(false);
+    }
+  };
+
+  const handleInspiration = async () => {
+    setLoadingIdeas(true);
+    setError(null);
+    try {
+      const { ideas } = await getInspiration();
+      setInspirations(ideas);
+    } catch (err) {
+      setError((err as Error).message || '灵感生成失败，请重试');
+    } finally {
+      setLoadingIdeas(false);
     }
   };
 
@@ -99,8 +114,33 @@ export default function Home() {
             onChange={(e) => setPrompt(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && e.metaKey) handleCreate(); }}
           />
+          {/* 灵感区域 */}
+          {inspirations.length > 0 && (
+            <div className="mt-3 space-y-2">
+              {inspirations.map((idea, i) => (
+                <button
+                  key={i}
+                  className="w-full text-left text-sm text-gray-600 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg px-3 py-2.5 transition-colors"
+                  onClick={() => { setPrompt(idea); setInspirations([]); }}
+                >
+                  <span className="text-amber-500 font-medium mr-1.5">{i + 1}.</span>
+                  {idea}
+                </button>
+              ))}
+            </div>
+          )}
+
           <div className="flex justify-between items-center mt-3">
-            <span className="text-xs text-gray-400">⌘+Enter 快速创建</span>
+            <button
+              className="text-xs text-amber-600 hover:text-amber-700 hover:bg-amber-50 px-2 py-1 rounded transition-colors disabled:opacity-50 flex items-center gap-1"
+              onClick={handleInspiration}
+              disabled={loadingIdeas}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+              </svg>
+              {loadingIdeas ? '生成灵感中...' : '帮我想想'}
+            </button>
             <button
               className="bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
               onClick={handleCreate}
