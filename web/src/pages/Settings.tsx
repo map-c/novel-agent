@@ -19,8 +19,8 @@ function Toast({ message, onClose }: { message: string; onClose: () => void }) {
 
   return (
     <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-fade-in">
-      <div className="bg-gray-900 text-white text-sm px-5 py-2.5 rounded-lg shadow-lg flex items-center gap-2">
-        <svg className="w-4 h-4 text-green-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div className="bg-gray-900 text-white text-sm px-5 py-2.5 rounded-xl shadow-lg flex items-center gap-2">
+        <svg className="w-4 h-4 text-primary-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
         </svg>
         {message}
@@ -35,6 +35,12 @@ const TIER_LABELS: Record<string, string> = {
   summary: '摘要模型（压缩/总结）',
 };
 
+const TIER_ICONS: Record<string, string> = {
+  planning: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2',
+  writing: 'M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z',
+  summary: 'M4 6h16M4 12h16M4 18h7',
+};
+
 export default function Settings() {
   const [tab, setTab] = useState<Tab>('models');
   const [toast, setToast] = useState<string | null>(null);
@@ -42,34 +48,36 @@ export default function Settings() {
 
   const showToast = (message: string) => setToast(message);
 
+  const tabs: [Tab, string][] = [
+    ['models', '模型配置'],
+    ['prompts', '提示词管理'],
+    ['presets', '生成预设'],
+    ['stats', '用量统计'],
+  ];
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-4xl mx-auto px-4 py-12">
+    <div className="min-h-screen bg-warm-50">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-12">
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">
-          <button onClick={() => navigate('/')} className="text-gray-400 hover:text-gray-600">
+          <button onClick={() => navigate('/')} className="text-gray-400 hover:text-primary-600 cursor-pointer">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
-            <p className="text-gray-500 text-sm">管理模型、提示词和生成预设</p>
+            <h1 className="text-2xl font-serif font-bold text-gray-900">Settings</h1>
+            <p className="text-gray-400 text-sm">管理模型、提示词和生成预设</p>
           </div>
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 bg-gray-100 rounded-lg p-1 mb-6">
-          {([
-            ['models', '模型配置'],
-            ['prompts', '提示词管理'],
-            ['presets', '生成预设'],
-            ['stats', '用量统计'],
-          ] as [Tab, string][]).map(([key, label]) => (
+        <div className="flex gap-0.5 bg-warm-100 rounded-xl p-1 mb-6">
+          {tabs.map(([key, label]) => (
             <button
               key={key}
               onClick={() => setTab(key)}
-              className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+              className={`flex-1 py-2 px-2 sm:px-4 rounded-lg text-xs sm:text-sm font-medium cursor-pointer text-center ${
                 tab === key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
               }`}
             >
@@ -131,25 +139,32 @@ function ModelsTab({ showToast }: { showToast: (msg: string) => void }) {
     }));
   };
 
-  if (loading) return <div className="text-gray-400 text-center py-12">加载中...</div>;
+  if (loading) return <div className="text-gray-400 text-center py-12 font-serif italic">加载中...</div>;
 
   return (
     <div className="space-y-4">
       {Object.entries(models).map(([tier, info]) => (
-        <div key={tier} className="bg-white rounded-lg border p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-gray-900">{TIER_LABELS[tier] ?? tier}</h3>
+        <div key={tier} className="bg-white rounded-xl border border-gray-100 p-6 shadow-sm">
+          <div className="flex items-center justify-between gap-2 mb-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-8 h-8 rounded-lg bg-primary-50 flex items-center justify-center shrink-0">
+                <svg className="w-4 h-4 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={TIER_ICONS[tier] ?? TIER_ICONS.planning} />
+                </svg>
+              </div>
+              <h3 className="font-semibold text-gray-900 text-sm sm:text-base">{TIER_LABELS[tier] ?? tier}</h3>
+            </div>
             {!info.isDefault && (
-              <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded">已自定义</span>
+              <span className="text-[11px] bg-primary-50 text-primary-700 px-2.5 py-0.5 rounded-full font-medium whitespace-nowrap shrink-0">已自定义</span>
             )}
           </div>
 
           <div className="space-y-3">
             <div>
-              <label className="block text-xs text-gray-500 mb-1">模型名称</label>
+              <label className="block text-xs text-gray-400 mb-1 font-medium">模型名称</label>
               <input
                 type="text"
-                className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent"
                 value={info.config.model}
                 onChange={(e) => updateField(tier, 'model', e.target.value)}
               />
@@ -157,24 +172,24 @@ function ModelsTab({ showToast }: { showToast: (msg: string) => void }) {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs text-gray-500 mb-1">
-                  Temperature: {info.config.temperature ?? 0}
+                <label className="block text-xs text-gray-400 mb-1 font-medium">
+                  Temperature: <span className="text-primary-600">{info.config.temperature ?? 0}</span>
                 </label>
                 <input
                   type="range"
                   min="0"
                   max="2"
                   step="0.1"
-                  className="w-full"
+                  className="w-full accent-primary-600"
                   value={info.config.temperature ?? 0}
                   onChange={(e) => updateField(tier, 'temperature', parseFloat(e.target.value))}
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Max Tokens</label>
+                <label className="block text-xs text-gray-400 mb-1 font-medium">Max Tokens</label>
                 <input
                   type="number"
-                  className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent"
                   value={info.config.maxTokens ?? 4000}
                   onChange={(e) => updateField(tier, 'maxTokens', parseInt(e.target.value) || 0)}
                 />
@@ -182,10 +197,10 @@ function ModelsTab({ showToast }: { showToast: (msg: string) => void }) {
             </div>
           </div>
 
-          <div className="flex justify-end gap-2 mt-4">
+          <div className="flex justify-end gap-2 mt-5">
             {!info.isDefault && (
               <button
-                className="text-sm text-gray-500 hover:text-gray-700 px-3 py-1.5"
+                className="text-sm text-gray-500 hover:text-gray-700 px-3 py-1.5 cursor-pointer"
                 onClick={() => handleReset(tier)}
                 disabled={saving === tier}
               >
@@ -193,7 +208,7 @@ function ModelsTab({ showToast }: { showToast: (msg: string) => void }) {
               </button>
             )}
             <button
-              className="text-sm bg-blue-600 text-white px-4 py-1.5 rounded-md hover:bg-blue-700 disabled:opacity-50"
+              className="text-sm bg-primary-600 text-white px-4 py-1.5 rounded-lg hover:bg-primary-700 disabled:opacity-50 cursor-pointer"
               onClick={() => handleSave(tier)}
               disabled={saving === tier}
             >
@@ -247,24 +262,24 @@ function PromptsTab({ showToast }: { showToast: (msg: string) => void }) {
     showToast('已重置为默认提示词');
   };
 
-  if (loading) return <div className="text-gray-400 text-center py-12">加载中...</div>;
+  if (loading) return <div className="text-gray-400 text-center py-12 font-serif italic">加载中...</div>;
 
   return (
     <div className="space-y-2">
       {Object.entries(prompts).map(([key, info]) => (
-        <div key={key} className="bg-white rounded-lg border">
+        <div key={key} className="bg-white rounded-xl border border-gray-100 shadow-sm">
           <button
-            className="w-full px-5 py-4 flex items-center justify-between text-left"
+            className="w-full px-5 py-4 flex items-center justify-between text-left cursor-pointer"
             onClick={() => setExpanded(expanded === key ? null : key)}
           >
             <div className="flex items-center gap-3">
               <span className="font-medium text-gray-900 text-sm">{info.label}</span>
               {!info.isDefault && (
-                <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded">已自定义</span>
+                <span className="text-[11px] bg-primary-50 text-primary-700 px-2.5 py-0.5 rounded-full font-medium">已自定义</span>
               )}
             </div>
             <svg
-              className={`w-4 h-4 text-gray-400 transition-transform ${expanded === key ? 'rotate-180' : ''}`}
+              className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${expanded === key ? 'rotate-180' : ''}`}
               fill="none" stroke="currentColor" viewBox="0 0 24 24"
             >
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -272,9 +287,9 @@ function PromptsTab({ showToast }: { showToast: (msg: string) => void }) {
           </button>
 
           {expanded === key && (
-            <div className="px-5 pb-4 border-t">
+            <div className="px-5 pb-5 border-t border-gray-50">
               <textarea
-                className="w-full border rounded-md p-3 text-sm mt-3 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                className="w-full border border-gray-200 rounded-lg p-3 text-sm mt-4 resize-none focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent font-mono"
                 rows={8}
                 value={editValues[key] ?? ''}
                 onChange={(e) => setEditValues((prev) => ({ ...prev, [key]: e.target.value }))}
@@ -285,7 +300,7 @@ function PromptsTab({ showToast }: { showToast: (msg: string) => void }) {
                   <summary className="text-xs text-gray-400 cursor-pointer hover:text-gray-600">
                     查看默认值
                   </summary>
-                  <pre className="mt-1 text-xs text-gray-400 bg-gray-50 rounded p-2 whitespace-pre-wrap">
+                  <pre className="mt-1 text-xs text-gray-400 bg-warm-50 rounded-lg p-3 whitespace-pre-wrap">
                     {info.defaultValue}
                   </pre>
                 </details>
@@ -294,7 +309,7 @@ function PromptsTab({ showToast }: { showToast: (msg: string) => void }) {
               <div className="flex justify-end gap-2 mt-3">
                 {!info.isDefault && (
                   <button
-                    className="text-sm text-gray-500 hover:text-gray-700 px-3 py-1.5"
+                    className="text-sm text-gray-500 hover:text-gray-700 px-3 py-1.5 cursor-pointer"
                     onClick={() => handleReset(key)}
                     disabled={saving === key}
                   >
@@ -302,7 +317,7 @@ function PromptsTab({ showToast }: { showToast: (msg: string) => void }) {
                   </button>
                 )}
                 <button
-                  className="text-sm bg-blue-600 text-white px-4 py-1.5 rounded-md hover:bg-blue-700 disabled:opacity-50"
+                  className="text-sm bg-primary-600 text-white px-4 py-1.5 rounded-lg hover:bg-primary-700 disabled:opacity-50 cursor-pointer"
                   onClick={() => handleSave(key)}
                   disabled={saving === key}
                 >
@@ -335,39 +350,39 @@ function PresetsTab({ showToast }: { showToast: (msg: string) => void }) {
     showToast(`已应用「${presets[name].label}」预设`);
   };
 
-  if (loading) return <div className="text-gray-400 text-center py-12">加载中...</div>;
+  if (loading) return <div className="text-gray-400 text-center py-12 font-serif italic">加载中...</div>;
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-gray-500 mb-2">
+      <p className="text-sm text-gray-400 mb-2">
         预设会覆盖当前的模型配置（模型名称 + 参数）。应用后可在「模型配置」Tab 中查看和微调。
       </p>
       {Object.entries(presets).map(([name, preset]) => (
-        <div key={name} className="bg-white rounded-lg border p-5">
-          <div className="flex items-center justify-between mb-3">
+        <div key={name} className="bg-white rounded-xl border border-gray-100 p-6 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="font-semibold text-gray-900">{preset.label}</h3>
-              <p className="text-sm text-gray-500 mt-0.5">{preset.description}</p>
+              <p className="text-sm text-gray-400 mt-0.5">{preset.description}</p>
             </div>
             <button
-              className="text-sm bg-blue-600 text-white px-4 py-1.5 rounded-md hover:bg-blue-700 disabled:opacity-50"
+              className="text-sm bg-primary-600 text-white px-4 py-1.5 rounded-lg hover:bg-primary-700 disabled:opacity-50 cursor-pointer"
               onClick={() => handleApply(name)}
               disabled={applying === name}
             >
-              {applying === name ? '应���中...' : '应用'}
+              {applying === name ? '应用中...' : '应用'}
             </button>
           </div>
 
           <div className="grid grid-cols-3 gap-3">
             {Object.entries(preset.models).map(([tier, config]) => (
-              <div key={tier} className="bg-gray-50 rounded-md p-3">
-                <div className="text-xs text-gray-500 mb-1">{TIER_LABELS[tier] ?? tier}</div>
+              <div key={tier} className="bg-warm-50 rounded-lg p-3">
+                <div className="text-xs text-gray-400 mb-1">{TIER_LABELS[tier] ?? tier}</div>
                 <div className="text-sm font-mono">
-                  <span className="text-gray-600">temp:</span>{' '}
-                  <span className="font-semibold">{config.temperature}</span>
-                  <span className="text-gray-400 mx-1">|</span>
-                  <span className="text-gray-600">tokens:</span>{' '}
-                  <span className="font-semibold">{config.maxTokens}</span>
+                  <span className="text-gray-500">temp:</span>{' '}
+                  <span className="font-semibold text-gray-700">{config.temperature}</span>
+                  <span className="text-gray-300 mx-1">|</span>
+                  <span className="text-gray-500">tokens:</span>{' '}
+                  <span className="font-semibold text-gray-700">{config.maxTokens}</span>
                 </div>
               </div>
             ))}
@@ -398,7 +413,7 @@ function formatStage(stage: string): string {
 }
 
 const RATING_LABELS: Record<string, { text: string; color: string }> = {
-  satisfied: { text: '满意', color: 'text-green-600 bg-green-50' },
+  satisfied: { text: '满意', color: 'text-primary-700 bg-primary-50' },
   unsatisfied: { text: '不满意', color: 'text-red-600 bg-red-50' },
 };
 
@@ -421,7 +436,6 @@ function StatsTab() {
     listProjects().then(async (ps) => {
       setProjects(ps);
       if (ps.length > 0) setSelectedId(ps[0].id);
-      // 加载全局汇总
       const allData = await Promise.all(ps.map(async (p) => {
         const [u, f] = await Promise.all([getUsage(p.id), getFeedback(p.id)]);
         return { usage: u, feedback: f };
@@ -449,28 +463,28 @@ function StatsTab() {
 
   return (
     <div className="space-y-6">
-      {/* 全局汇总 */}
+      {/* Global summary */}
       {globalStats && (
-        <div className="bg-white rounded-lg border p-5">
-          <h3 className="font-semibold text-gray-900 text-sm mb-3">全局汇总</h3>
+        <div className="bg-white rounded-xl border border-gray-100 p-6 shadow-sm">
+          <h3 className="font-serif font-semibold text-gray-900 text-sm mb-4">全局汇总</h3>
           <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
-            <div className="bg-blue-50 rounded-lg p-3 text-center">
-              <div className="text-lg font-bold text-blue-700">{globalStats.totalTokens.toLocaleString()}</div>
-              <div className="text-xs text-blue-500">总 Tokens</div>
+            <div className="bg-primary-50 rounded-xl p-3 text-center">
+              <div className="text-lg font-bold text-primary-700">{globalStats.totalTokens.toLocaleString()}</div>
+              <div className="text-xs text-primary-500">总 Tokens</div>
             </div>
-            <div className="bg-gray-50 rounded-lg p-3 text-center">
+            <div className="bg-warm-50 rounded-xl p-3 text-center">
               <div className="text-lg font-bold text-gray-700">{globalStats.totalCalls}</div>
               <div className="text-xs text-gray-500">总调用次数</div>
             </div>
-            <div className="bg-gray-50 rounded-lg p-3 text-center">
+            <div className="bg-warm-50 rounded-xl p-3 text-center">
               <div className="text-lg font-bold text-gray-700">{globalStats.projectCount}</div>
               <div className="text-xs text-gray-500">项目数</div>
             </div>
-            <div className="bg-green-50 rounded-lg p-3 text-center">
+            <div className="bg-green-50 rounded-xl p-3 text-center">
               <div className="text-lg font-bold text-green-700">{globalStats.satisfiedCount}</div>
               <div className="text-xs text-green-500">满意</div>
             </div>
-            <div className="bg-red-50 rounded-lg p-3 text-center">
+            <div className="bg-red-50 rounded-xl p-3 text-center">
               <div className="text-lg font-bold text-red-700">{globalStats.feedbackCount - globalStats.satisfiedCount}</div>
               <div className="text-xs text-red-500">不满意</div>
             </div>
@@ -478,11 +492,11 @@ function StatsTab() {
         </div>
       )}
 
-      {/* 项目选择器 */}
+      {/* Project selector */}
       <div>
-        <label className="block text-xs text-gray-500 mb-1">选择项目查看详情</label>
+        <label className="block text-xs text-gray-400 mb-1 font-medium">选择项目查看详情</label>
         <select
-          className="w-full border rounded-lg px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent"
           value={selectedId}
           onChange={(e) => setSelectedId(e.target.value)}
         >
@@ -494,71 +508,71 @@ function StatsTab() {
         </select>
       </div>
 
-      {loading && <div className="text-gray-400 text-center py-8">加载中...</div>}
+      {loading && <div className="text-gray-400 text-center py-8 font-serif italic">加载中...</div>}
 
       {!loading && usage && (
         <>
-          {/* Token 用量 */}
-          <div className="bg-white rounded-lg border">
-            <div className="px-5 py-4 border-b">
-              <h3 className="font-semibold text-gray-900 text-sm">Token 用量</h3>
+          {/* Token usage */}
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm">
+            <div className="px-6 py-4 border-b border-gray-50">
+              <h3 className="font-serif font-semibold text-gray-900 text-sm">Token 用量</h3>
             </div>
 
             {usage.total.calls === 0 ? (
-              <div className="px-5 py-8 text-center text-sm text-gray-400">
+              <div className="px-6 py-8 text-center text-sm text-gray-400 font-serif italic">
                 该项目暂无用量数据
               </div>
             ) : (
-              <div className="px-5 py-3">
-                {/* 汇总卡片 */}
+              <div className="px-6 py-4">
+                {/* Summary cards */}
                 <div className="grid grid-cols-4 gap-3 mb-4">
-                  <div className="bg-blue-50 rounded-lg p-3 text-center">
-                    <div className="text-lg font-bold text-blue-700">{usage.total.totalTokens.toLocaleString()}</div>
-                    <div className="text-xs text-blue-500">总 Tokens</div>
+                  <div className="bg-primary-50 rounded-xl p-3 text-center">
+                    <div className="text-lg font-bold text-primary-700">{usage.total.totalTokens.toLocaleString()}</div>
+                    <div className="text-xs text-primary-500">总 Tokens</div>
                   </div>
-                  <div className="bg-gray-50 rounded-lg p-3 text-center">
+                  <div className="bg-warm-50 rounded-xl p-3 text-center">
                     <div className="text-lg font-bold text-gray-700">{usage.total.promptTokens.toLocaleString()}</div>
                     <div className="text-xs text-gray-500">Prompt</div>
                   </div>
-                  <div className="bg-gray-50 rounded-lg p-3 text-center">
+                  <div className="bg-warm-50 rounded-xl p-3 text-center">
                     <div className="text-lg font-bold text-gray-700">{usage.total.completionTokens.toLocaleString()}</div>
                     <div className="text-xs text-gray-500">Completion</div>
                   </div>
-                  <div className="bg-gray-50 rounded-lg p-3 text-center">
+                  <div className="bg-warm-50 rounded-xl p-3 text-center">
                     <div className="text-lg font-bold text-gray-700">{usage.total.calls}</div>
                     <div className="text-xs text-gray-500">调用次数</div>
                   </div>
                 </div>
 
-                {/* 明细表 */}
+                {/* Detail table */}
                 <div className="overflow-x-auto">
                 <table className="w-full text-xs min-w-[500px]">
                   <thead>
-                    <tr className="text-gray-400 border-b">
-                      <th className="text-left py-2 font-medium">阶段</th>
-                      <th className="text-left py-2 font-medium">模型</th>
-                      <th className="text-right py-2 font-medium">Prompt</th>
-                      <th className="text-right py-2 font-medium">Completion</th>
-                      <th className="text-right py-2 font-medium">Total</th>
+                    <tr className="text-gray-400 border-b border-gray-100">
+                      <th className="text-left py-2.5 font-medium">阶段</th>
+                      <th className="text-left py-2.5 font-medium">模型</th>
+                      <th className="text-right py-2.5 font-medium">Prompt</th>
+                      <th className="text-right py-2.5 font-medium">Completion</th>
+                      <th className="text-right py-2.5 font-medium">Total</th>
                     </tr>
                   </thead>
                   <tbody>
                     {usage.stages.map((s) => (
-                      <tr key={s.stage} className="border-b border-gray-50">
-                        <td className="py-2 text-gray-700">{formatStage(s.stage)}</td>
-                        <td className="py-2 text-gray-400 font-mono">{s.model.split('/').pop()}</td>
-                        <td className="py-2 text-right text-gray-600">{s.promptTokens.toLocaleString()}</td>
-                        <td className="py-2 text-right text-gray-600">{s.completionTokens.toLocaleString()}</td>
-                        <td className="py-2 text-right font-medium text-gray-800">{s.totalTokens.toLocaleString()}</td>
+                      <tr key={s.stage} className="border-b border-gray-50 hover:bg-warm-50">
+                        <td className="py-2.5 text-gray-700">{formatStage(s.stage)}</td>
+                        <td className="py-2.5 text-gray-400 font-mono">{s.model.split('/').pop()}</td>
+                        <td className="py-2.5 text-right text-gray-600">{s.promptTokens.toLocaleString()}</td>
+                        <td className="py-2.5 text-right text-gray-600">{s.completionTokens.toLocaleString()}</td>
+                        <td className="py-2.5 text-right font-medium text-gray-800">{s.totalTokens.toLocaleString()}</td>
                       </tr>
                     ))}
                   </tbody>
                   <tfoot>
-                    <tr className="border-t font-medium">
-                      <td className="py-2 text-gray-800" colSpan={2}>合计</td>
-                      <td className="py-2 text-right text-gray-800">{usage.total.promptTokens.toLocaleString()}</td>
-                      <td className="py-2 text-right text-gray-800">{usage.total.completionTokens.toLocaleString()}</td>
-                      <td className="py-2 text-right text-gray-900">{usage.total.totalTokens.toLocaleString()}</td>
+                    <tr className="border-t border-gray-200 font-medium">
+                      <td className="py-2.5 text-gray-800" colSpan={2}>合计</td>
+                      <td className="py-2.5 text-right text-gray-800">{usage.total.promptTokens.toLocaleString()}</td>
+                      <td className="py-2.5 text-right text-gray-800">{usage.total.completionTokens.toLocaleString()}</td>
+                      <td className="py-2.5 text-right text-gray-900">{usage.total.totalTokens.toLocaleString()}</td>
                     </tr>
                   </tfoot>
                 </table>
@@ -567,23 +581,23 @@ function StatsTab() {
             )}
           </div>
 
-          {/* 用户反馈 */}
-          <div className="bg-white rounded-lg border">
-            <div className="px-5 py-4 border-b">
-              <h3 className="font-semibold text-gray-900 text-sm">用户反馈</h3>
+          {/* User feedback */}
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm">
+            <div className="px-6 py-4 border-b border-gray-50">
+              <h3 className="font-serif font-semibold text-gray-900 text-sm">用户反馈</h3>
             </div>
 
             {feedback.length === 0 ? (
-              <div className="px-5 py-8 text-center text-sm text-gray-400">
+              <div className="px-6 py-8 text-center text-sm text-gray-400 font-serif italic">
                 该项目暂无反馈
               </div>
             ) : (
-              <div className="px-5 py-3">
-                <div className="space-y-2">
+              <div className="px-6 py-3">
+                <div className="space-y-1">
                   {feedback.map((f) => {
                     const ratingInfo = RATING_LABELS[f.rating] ?? { text: f.rating, color: 'text-gray-600 bg-gray-50' };
                     return (
-                      <div key={f.id} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+                      <div key={f.id} className="flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0">
                         <div className="flex items-center gap-2">
                           <span className="text-sm text-gray-700">
                             {TARGET_LABELS[f.targetType] ?? f.targetType}
@@ -591,7 +605,7 @@ function StatsTab() {
                           </span>
                         </div>
                         <div className="flex items-center gap-3">
-                          <span className={`text-xs px-2 py-0.5 rounded ${ratingInfo.color}`}>
+                          <span className={`text-[11px] px-2.5 py-0.5 rounded-full font-medium ${ratingInfo.color}`}>
                             {ratingInfo.text}
                           </span>
                           <span className="text-xs text-gray-300">

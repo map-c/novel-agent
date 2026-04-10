@@ -230,7 +230,7 @@ export default function Project() {
   };
 
   if (!project) {
-    return <div className="min-h-screen bg-gray-50 flex items-center justify-center text-gray-400">加载中...</div>;
+    return <div className="min-h-screen bg-warm-50 flex items-center justify-center text-gray-400 font-serif italic">加载中...</div>;
   }
 
   const stageIndex = STAGES.indexOf(stage);
@@ -238,19 +238,28 @@ export default function Project() {
   const isReview = REVIEW_STAGES.has(stage);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-warm-50">
       {/* Header */}
-      <header className="bg-white border-b px-4 sm:px-6 py-3 flex items-center justify-between gap-2">
+      <header className="bg-white/80 backdrop-blur-sm border-b border-gray-100 px-4 sm:px-6 py-3 flex items-center justify-between gap-2 sticky top-0 z-10">
         <div className="flex items-center gap-2 sm:gap-4 min-w-0">
-          <Link to="/" className="text-gray-400 hover:text-gray-600 text-sm shrink-0">← 返回</Link>
-          <h1 className="text-sm sm:text-lg font-semibold text-gray-900 truncate">{project.plotOutline?.premise ? project.plotOutline.premise.slice(0, 30) : '新项目'}</h1>
+          <Link to="/" className="text-gray-400 hover:text-primary-600 text-sm shrink-0 cursor-pointer">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 19l-7-7 7-7" />
+            </svg>
+          </Link>
+          <h1 className="text-sm sm:text-lg font-serif font-semibold text-gray-900 truncate">{project.plotOutline?.premise ? project.plotOutline.premise.slice(0, 30) : '新项目'}</h1>
         </div>
         <div className="flex items-center gap-3">
-          {connected && <span className="text-xs text-green-500">● 已连接</span>}
+          {connected && (
+            <span className="flex items-center gap-1.5 text-xs text-primary-600">
+              <span className="w-1.5 h-1.5 bg-primary-500 rounded-full animate-pulse" />
+              已连接
+            </span>
+          )}
           {stage === 'complete' && (
             <a
               href={getExportUrl(id!)}
-              className="text-sm bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded"
+              className="text-sm text-primary-700 bg-primary-50 hover:bg-primary-100 px-3 py-1.5 rounded-lg cursor-pointer"
             >
               导出 Markdown
             </a>
@@ -258,32 +267,32 @@ export default function Project() {
         </div>
       </header>
 
-      {/* 进度条 */}
-      <div className="bg-white border-b px-6 py-3">
+      {/* Progress bar */}
+      <div className="bg-white/60 backdrop-blur-sm border-b border-gray-100 px-6 py-3">
         <div className="hidden sm:flex items-center gap-1 max-w-3xl mx-auto">
           {STAGES.map((s, i) => (
             <div key={s} className="flex items-center flex-1">
               <div className={`
-                h-2 flex-1 rounded-full transition-colors
-                ${i < stageIndex ? 'bg-blue-500' : i === stageIndex ? 'bg-blue-400 animate-pulse' : 'bg-gray-200'}
+                h-1.5 flex-1 rounded-full transition-all duration-500
+                ${i < stageIndex ? 'bg-primary-500' : i === stageIndex ? 'bg-primary-400 animate-shimmer' : 'bg-gray-200'}
               `} />
               {i < STAGES.length - 1 && <div className="w-1" />}
             </div>
           ))}
         </div>
-        <div className="text-center text-xs text-gray-500 sm:mt-2">
+        <div className="text-center text-xs text-gray-500 sm:mt-2 font-medium">
           <span className="sm:hidden text-gray-400">{stageIndex + 1}/{STAGES.length} · </span>
           {STAGE_LABELS[stage] ?? stage}
         </div>
       </div>
 
-      {/* 主体 */}
+      {/* Main */}
       <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
-        {/* 错误提示 */}
+        {/* Error */}
         {errorMsg && (
-          <div className="mb-4 bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-lg flex items-center justify-between">
+          <div className="mb-4 bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-xl flex items-center justify-between animate-slide-up">
             <span>{errorMsg}</span>
-            <button onClick={() => setErrorMsg(null)} className="text-red-400 hover:text-red-600 ml-2 shrink-0">
+            <button onClick={() => setErrorMsg(null)} className="text-red-400 hover:text-red-600 ml-2 shrink-0 cursor-pointer">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
@@ -291,26 +300,31 @@ export default function Project() {
           </div>
         )}
 
-        {/* SSE 连接断开提示 */}
+        {/* SSE disconnected */}
         {retryExhausted && (
-          <div className="mb-4 bg-yellow-50 border border-yellow-200 text-yellow-800 text-sm px-4 py-3 rounded-lg flex items-center justify-between">
+          <div className="mb-4 bg-amber-50 border border-amber-200 text-amber-800 text-sm px-4 py-3 rounded-xl flex items-center justify-between">
             <span>连接已断开，请刷新页面重试</span>
             <button
               onClick={() => window.location.reload()}
-              className="text-yellow-700 font-medium hover:underline ml-2 shrink-0"
+              className="text-amber-700 font-medium hover:underline ml-2 shrink-0 cursor-pointer"
             >
               刷新
             </button>
           </div>
         )}
 
-        {/* 待启动 */}
+        {/* Ready to start */}
         {stage === 'input' && !sseUrl && (
-          <div className="text-center py-20">
-            <p className="text-gray-500 mb-4">准备好了吗？</p>
-            <p className="text-sm text-gray-400 mb-6 max-w-md mx-auto">{project.userPrompt}</p>
+          <div className="text-center py-24">
+            <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-primary-50 flex items-center justify-center">
+              <svg className="w-8 h-8 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+              </svg>
+            </div>
+            <p className="text-gray-800 font-serif text-lg mb-2">准备好了吗？</p>
+            <p className="text-sm text-gray-400 mb-8 max-w-md mx-auto leading-relaxed">{project.userPrompt}</p>
             <button
-              className="bg-blue-600 text-white px-8 py-3 rounded-lg font-medium hover:bg-blue-700"
+              className="bg-primary-600 text-white px-8 py-3 rounded-xl font-medium hover:bg-primary-700 shadow-sm shadow-primary-200 cursor-pointer"
               onClick={handleStart}
             >
               启动生成
@@ -327,16 +341,16 @@ export default function Project() {
           />
         )}
 
-        {/* 处理中 */}
+        {/* Processing */}
         {isProcessing && (
           <div className="py-10">
             <div className="text-center mb-6">
-              <div className="inline-block w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4" />
-              <p className="text-gray-600">{STAGE_LABELS[stage]}...</p>
+              <div className="inline-block w-8 h-8 border-[3px] border-primary-500 border-t-transparent rounded-full animate-spin mb-4" />
+              <p className="text-gray-600 font-medium">{STAGE_LABELS[stage]}...</p>
             </div>
             {stageStreamingText && (
-              <div className="bg-white rounded-lg border p-4 max-h-96 overflow-y-auto">
-                <p className="text-xs text-gray-400 mb-2">实时生成预览</p>
+              <div className="bg-white rounded-xl border border-gray-100 p-5 max-h-96 overflow-y-auto shadow-sm">
+                <p className="text-xs text-gray-400 mb-2 font-medium">实时生成预览</p>
                 <pre className="text-sm text-gray-700 whitespace-pre-wrap font-mono leading-relaxed">{stageStreamingText}</pre>
               </div>
             )}
@@ -426,8 +440,8 @@ function ReviewView({
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <h2 className="text-lg font-semibold text-gray-800">请审阅{stageTitle[stage]}</h2>
-        <p className="text-sm text-gray-500 mt-1">
+        <h2 className="text-lg font-serif font-semibold text-gray-800">请审阅{stageTitle[stage]}</h2>
+        <p className="text-sm text-gray-400 mt-1">
           {editing ? '编辑完成后点击保存' : '确认后将继续下一步，也可以点击编辑进行修改'}
         </p>
       </div>
@@ -447,17 +461,17 @@ function ReviewView({
       {stage === 'review_outline' && (
         <>
           {project.worldBuilding && (
-            <section className="bg-gray-50 rounded-lg border p-4">
-              <h3 className="text-sm font-semibold text-gray-500 mb-2">世界观</h3>
+            <section className="bg-warm-50 rounded-xl border border-gray-100 p-4">
+              <h3 className="text-sm font-serif font-semibold text-gray-500 mb-2">世界观</h3>
               <p className="text-xs text-gray-500">{project.worldBuilding.synopsis}</p>
             </section>
           )}
           {project.characters.length > 0 && (
-            <section className="bg-gray-50 rounded-lg border p-4">
-              <h3 className="text-sm font-semibold text-gray-500 mb-2">角色</h3>
+            <section className="bg-warm-50 rounded-xl border border-gray-100 p-4">
+              <h3 className="text-sm font-serif font-semibold text-gray-500 mb-2">角色</h3>
               <div className="flex flex-wrap gap-2">
                 {project.characters.map((c) => (
-                  <span key={c.id} className="text-xs bg-white border px-2 py-1 rounded">{c.name} ({c.role})</span>
+                  <span key={c.id} className="text-xs bg-white border border-gray-100 px-2.5 py-1 rounded-full">{c.name} ({c.role})</span>
                 ))}
               </div>
             </section>
@@ -478,25 +492,25 @@ function ReviewView({
         />
       )}
 
-      {/* 操作按钮 */}
+      {/* Action buttons */}
       {!editing && !showRejectConfirm && (
         <div className="flex flex-wrap items-center justify-center gap-3 py-4">
           <button
-            className="text-gray-500 border border-gray-300 px-6 py-2.5 rounded-lg text-sm hover:bg-gray-50 disabled:opacity-50"
+            className="text-gray-500 border border-gray-200 px-6 py-2.5 rounded-xl text-sm hover:bg-gray-50 disabled:opacity-50 cursor-pointer"
             onClick={() => setShowRejectConfirm(true)}
             disabled={loading}
           >
             驳回，重新生成
           </button>
           <button
-            className="text-blue-600 border border-blue-300 px-6 py-2.5 rounded-lg text-sm hover:bg-blue-50 disabled:opacity-50"
+            className="text-primary-600 border border-primary-200 px-6 py-2.5 rounded-xl text-sm hover:bg-primary-50 disabled:opacity-50 cursor-pointer"
             onClick={() => setEditing(true)}
             disabled={loading}
           >
             编辑
           </button>
           <button
-            className="bg-green-600 text-white px-8 py-2.5 rounded-lg font-medium hover:bg-green-700 disabled:opacity-50"
+            className="bg-primary-600 text-white px-8 py-2.5 rounded-xl font-medium hover:bg-primary-700 disabled:opacity-50 cursor-pointer shadow-sm shadow-primary-200"
             onClick={() => onApprove()}
             disabled={loading}
           >
@@ -505,19 +519,19 @@ function ReviewView({
         </div>
       )}
 
-      {/* 驳回确认 */}
+      {/* Reject confirm */}
       {!editing && showRejectConfirm && (
         <div className="py-4 text-center space-y-3">
           <p className="text-sm text-red-600">确认驳回并重新生成{stageTitle[stage]}？</p>
           <div className="flex items-center justify-center gap-3">
             <button
-              className="text-sm text-gray-500 border border-gray-300 px-5 py-2 rounded-lg hover:bg-gray-50"
+              className="text-sm text-gray-500 border border-gray-200 px-5 py-2 rounded-xl hover:bg-gray-50 cursor-pointer"
               onClick={() => setShowRejectConfirm(false)}
             >
               取消
             </button>
             <button
-              className="text-sm text-white bg-red-500 font-medium px-5 py-2 rounded-lg hover:bg-red-600 disabled:opacity-50"
+              className="text-sm text-white bg-red-500 font-medium px-5 py-2 rounded-xl hover:bg-red-600 disabled:opacity-50 cursor-pointer"
               onClick={onReject}
               disabled={loading}
             >
@@ -534,16 +548,16 @@ function ReviewView({
 
 function WorldPreview({ data }: { data: NonNullable<ProjectDetail['worldBuilding']> }) {
   return (
-    <section className="bg-white rounded-lg border p-5">
-      <h3 className="font-semibold mb-3">世界观</h3>
-      <p className="text-sm text-gray-600 mb-3">{data.synopsis}</p>
+    <section className="bg-white rounded-xl border border-gray-100 p-6 shadow-sm">
+      <h3 className="font-serif font-semibold text-gray-800 mb-3">世界观</h3>
+      <p className="text-sm text-gray-600 mb-4 leading-relaxed">{data.synopsis}</p>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-        <div><span className="text-gray-400">时代:</span> {data.era}</div>
-        <div><span className="text-gray-400">基调:</span> {data.tone}</div>
-        <div><span className="text-gray-400">背景:</span> {data.setting}</div>
-        <div className="sm:col-span-2"><span className="text-gray-400">主题:</span> {data.themes.join('、')}</div>
+        <div className="bg-warm-50 rounded-lg p-3"><span className="text-gray-400 block mb-0.5">时代</span> <span className="text-gray-700">{data.era}</span></div>
+        <div className="bg-warm-50 rounded-lg p-3"><span className="text-gray-400 block mb-0.5">基调</span> <span className="text-gray-700">{data.tone}</span></div>
+        <div className="bg-warm-50 rounded-lg p-3 sm:col-span-2"><span className="text-gray-400 block mb-0.5">背景</span> <span className="text-gray-700">{data.setting}</span></div>
+        <div className="bg-warm-50 rounded-lg p-3 sm:col-span-2"><span className="text-gray-400 block mb-0.5">主题</span> <span className="text-gray-700">{data.themes.join('、')}</span></div>
         {data.rules.length > 0 && (
-          <div className="sm:col-span-2"><span className="text-gray-400">规则:</span> {data.rules.join('、')}</div>
+          <div className="bg-warm-50 rounded-lg p-3 sm:col-span-2"><span className="text-gray-400 block mb-0.5">规则</span> <span className="text-gray-700">{data.rules.join('、')}</span></div>
         )}
       </div>
     </section>
@@ -552,14 +566,14 @@ function WorldPreview({ data }: { data: NonNullable<ProjectDetail['worldBuilding
 
 function CharacterPreview({ data }: { data: ProjectDetail['characters'] }) {
   return (
-    <section className="bg-white rounded-lg border p-5">
-      <h3 className="font-semibold mb-3">角色 ({data.length})</h3>
+    <section className="bg-white rounded-xl border border-gray-100 p-6 shadow-sm">
+      <h3 className="font-serif font-semibold text-gray-800 mb-3">角色 ({data.length})</h3>
       <div className="space-y-3">
         {data.map((c) => (
-          <div key={c.id} className="border rounded-lg p-3">
+          <div key={c.id} className="border border-gray-100 rounded-xl p-4 hover:border-gray-200">
             <div className="flex items-center gap-2 mb-2">
-              <span className="font-medium">{c.name}</span>
-              <span className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">{c.role}</span>
+              <span className="font-medium text-gray-800">{c.name}</span>
+              <span className="text-[11px] bg-primary-50 text-primary-700 px-2 py-0.5 rounded-full">{c.role}</span>
             </div>
             <p className="text-xs text-gray-600 mb-1">{c.description}</p>
             <p className="text-xs text-gray-500"><span className="text-gray-400">动机:</span> {c.motivations.join('、')}</p>
@@ -573,14 +587,14 @@ function CharacterPreview({ data }: { data: ProjectDetail['characters'] }) {
 
 function OutlinePreview({ data }: { data: NonNullable<ProjectDetail['plotOutline']> }) {
   return (
-    <section className="bg-white rounded-lg border p-5">
-      <h3 className="font-semibold mb-1">章节大纲 ({data.totalChapters} 章)</h3>
-      <p className="text-sm text-gray-500 mb-3">{data.premise}</p>
+    <section className="bg-white rounded-xl border border-gray-100 p-6 shadow-sm">
+      <h3 className="font-serif font-semibold text-gray-800 mb-1">章节大纲 ({data.totalChapters} 章)</h3>
+      <p className="text-sm text-gray-500 mb-4">{data.premise}</p>
       <div className="space-y-2">
         {data.acts.flatMap((act) =>
           act.chapters.map((ch) => (
-            <div key={ch.number} className="border-l-2 border-blue-200 pl-3 py-1">
-              <div className="text-sm font-medium">第 {ch.number} 章：{ch.title}</div>
+            <div key={ch.number} className="border-l-2 border-primary-200 pl-4 py-1.5 hover:border-primary-400">
+              <div className="text-sm font-medium text-gray-800">第 {ch.number} 章：{ch.title}</div>
               <div className="text-xs text-gray-500 mt-0.5">{ch.summary.slice(0, 100)}...</div>
             </div>
           ))
@@ -592,9 +606,9 @@ function OutlinePreview({ data }: { data: NonNullable<ProjectDetail['plotOutline
 
 // ─── 编辑组件 ───
 
-const inputClass = 'w-full border rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400';
+const inputClass = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent';
 const textareaClass = `${inputClass} resize-y`;
-const labelClass = 'block text-xs text-gray-500 mb-1';
+const labelClass = 'block text-xs text-gray-400 mb-1 font-medium';
 
 function WorldEditor({
   data,
@@ -611,8 +625,8 @@ function WorldEditor({
   const set = (key: string, value: string) => setForm((f) => ({ ...f, [key]: value }));
 
   return (
-    <section className="bg-white rounded-lg border p-5 space-y-3">
-      <h3 className="font-semibold">编辑世界观</h3>
+    <section className="bg-white rounded-xl border border-gray-100 p-6 space-y-3 shadow-sm">
+      <h3 className="font-serif font-semibold text-gray-800">编辑世界观</h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label className={labelClass}>时代</label>
@@ -640,8 +654,8 @@ function WorldEditor({
         <textarea className={textareaClass} rows={4} value={form.synopsis} onChange={(e) => set('synopsis', e.target.value)} />
       </div>
       <div className="flex justify-end gap-3 pt-2">
-        <button className="text-gray-500 text-sm px-4 py-2 hover:bg-gray-50 rounded" onClick={onCancel}>取消</button>
-        <button className="bg-green-600 text-white text-sm px-6 py-2 rounded hover:bg-green-700 disabled:opacity-50" onClick={() => onSave(form)} disabled={loading}>
+        <button className="text-gray-500 text-sm px-4 py-2 hover:bg-gray-50 rounded-lg cursor-pointer" onClick={onCancel}>取消</button>
+        <button className="bg-primary-600 text-white text-sm px-6 py-2 rounded-xl hover:bg-primary-700 disabled:opacity-50 cursor-pointer shadow-sm shadow-primary-200" onClick={() => onSave(form)} disabled={loading}>
           保存并继续
         </button>
       </div>
@@ -668,17 +682,17 @@ function CharacterEditor({
   };
 
   return (
-    <section className="bg-white rounded-lg border p-5 space-y-3">
-      <h3 className="font-semibold">编辑角色 ({chars.length})</h3>
+    <section className="bg-white rounded-xl border border-gray-100 p-6 space-y-3 shadow-sm">
+      <h3 className="font-serif font-semibold text-gray-800">编辑角色 ({chars.length})</h3>
       {chars.map((c) => (
-        <div key={c.id} className="border rounded-lg p-3">
+        <div key={c.id} className="border border-gray-100 rounded-xl p-4">
           <button
-            className="w-full flex items-center justify-between text-left"
+            className="w-full flex items-center justify-between text-left cursor-pointer"
             onClick={() => setExpandedId(expandedId === c.id ? null : c.id)}
           >
             <div className="flex items-center gap-2">
               <span className="font-medium text-sm">{c.name}</span>
-              <span className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">{c.role}</span>
+              <span className="text-[11px] bg-primary-50 text-primary-700 px-2 py-0.5 rounded-full">{c.role}</span>
             </div>
             <span className="text-gray-400 text-xs">{expandedId === c.id ? '收起' : '展开'}</span>
           </button>
@@ -724,8 +738,8 @@ function CharacterEditor({
         </div>
       ))}
       <div className="flex justify-end gap-3 pt-2">
-        <button className="text-gray-500 text-sm px-4 py-2 hover:bg-gray-50 rounded" onClick={onCancel}>取消</button>
-        <button className="bg-green-600 text-white text-sm px-6 py-2 rounded hover:bg-green-700 disabled:opacity-50" onClick={() => onSave(chars)} disabled={loading}>
+        <button className="text-gray-500 text-sm px-4 py-2 hover:bg-gray-50 rounded-lg cursor-pointer" onClick={onCancel}>取消</button>
+        <button className="bg-primary-600 text-white text-sm px-6 py-2 rounded-xl hover:bg-primary-700 disabled:opacity-50 cursor-pointer shadow-sm shadow-primary-200" onClick={() => onSave(chars)} disabled={loading}>
           保存并继续
         </button>
       </div>
@@ -756,8 +770,8 @@ function OutlineEditor({
   };
 
   return (
-    <section className="bg-white rounded-lg border p-5 space-y-3">
-      <h3 className="font-semibold">编辑大纲</h3>
+    <section className="bg-white rounded-xl border border-gray-100 p-6 space-y-3 shadow-sm">
+      <h3 className="font-serif font-semibold text-gray-800">编辑大纲</h3>
       <div>
         <label className={labelClass}>故事前提</label>
         <input className={inputClass} value={outline.premise} onChange={(e) => setOutline((p: typeof data) => ({ ...p, premise: e.target.value }))} />
@@ -799,8 +813,8 @@ function OutlineEditor({
         </div>
       ))}
       <div className="flex justify-end gap-3 pt-2">
-        <button className="text-gray-500 text-sm px-4 py-2 hover:bg-gray-50 rounded" onClick={onCancel}>取消</button>
-        <button className="bg-green-600 text-white text-sm px-6 py-2 rounded hover:bg-green-700 disabled:opacity-50" onClick={() => onSave(outline)} disabled={loading}>
+        <button className="text-gray-500 text-sm px-4 py-2 hover:bg-gray-50 rounded-lg cursor-pointer" onClick={onCancel}>取消</button>
+        <button className="bg-primary-600 text-white text-sm px-6 py-2 rounded-xl hover:bg-primary-700 disabled:opacity-50 cursor-pointer shadow-sm shadow-primary-200" onClick={() => onSave(outline)} disabled={loading}>
           保存并继续
         </button>
       </div>
@@ -835,33 +849,36 @@ function GeneratingView({
 
   return (
     <div>
-      {/* 已完成的章节 */}
+      {/* Completed chapters */}
       {project.chapters.map((ch) => (
-        <div key={ch.id} className="mb-4 text-sm text-gray-400">
-          ✓ 第 {ch.number} 章：{ch.title} ({ch.charCount} 字)
+        <div key={ch.id} className="mb-3 flex items-center gap-2 text-sm text-gray-400">
+          <svg className="w-4 h-4 text-primary-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+          第 {ch.number} 章：{ch.title} ({ch.charCount} 字)
         </div>
       ))}
 
-      {/* 正在生成的章节 */}
+      {/* Streaming chapter */}
       {streamingChapter > 0 && (
-        <div className="bg-white rounded-lg border p-5">
-          <h3 className="font-semibold mb-3">
+        <div className="bg-white rounded-xl border border-gray-100 p-6 shadow-sm mt-2">
+          <h3 className="font-serif font-semibold text-gray-800 mb-3 flex items-center gap-2">
             第 {streamingChapter} 章
-            <span className="ml-2 inline-block w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+            <span className="inline-block w-2 h-2 bg-primary-500 rounded-full animate-pulse" />
           </h3>
           <div
             ref={textRef}
-            className="prose prose-sm max-h-96 overflow-y-auto whitespace-pre-wrap text-gray-700"
+            className="prose-literary max-h-96 overflow-y-auto whitespace-pre-wrap text-gray-700 text-sm"
           >
             {streamingText}
           </div>
         </div>
       )}
 
-      {/* 暂停按钮 */}
+      {/* Pause button */}
       <div className="text-center mt-6">
         <button
-          className="text-sm text-gray-500 border border-gray-300 px-5 py-2 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+          className="text-sm text-gray-500 border border-gray-200 px-5 py-2 rounded-xl hover:bg-gray-50 disabled:opacity-50 cursor-pointer"
           onClick={handlePause}
           disabled={pauseRequested}
         >
@@ -884,18 +901,17 @@ function PausedView({
   return (
     <div>
       <div className="text-center mb-6">
-        <h2 className="text-lg font-semibold text-gray-800">生成已暂停</h2>
-        <p className="text-sm text-gray-500 mt-1">
+        <h2 className="text-lg font-serif font-semibold text-gray-800">生成已暂停</h2>
+        <p className="text-sm text-gray-400 mt-1">
           已完成 {project.chapters.length} / {totalChapters} 章
         </p>
       </div>
 
-      {/* 已完成的章节列表 */}
-      <div className="bg-white rounded-lg border p-5 mb-6">
+      <div className="bg-white rounded-xl border border-gray-100 p-5 mb-6 shadow-sm">
         {project.chapters.map((ch) => (
-          <div key={ch.id} className="py-2 border-b last:border-b-0">
+          <div key={ch.id} className="py-2.5 border-b border-gray-50 last:border-b-0">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">第 {ch.number} 章：{ch.title}</span>
+              <span className="text-sm font-medium text-gray-800">第 {ch.number} 章：{ch.title}</span>
               <span className="text-xs text-gray-400">{ch.charCount} 字</span>
             </div>
           </div>
@@ -904,7 +920,7 @@ function PausedView({
 
       <div className="text-center">
         <button
-          className="bg-blue-600 text-white px-8 py-3 rounded-lg font-medium hover:bg-blue-700"
+          className="bg-primary-600 text-white px-8 py-3 rounded-xl font-medium hover:bg-primary-700 cursor-pointer shadow-sm shadow-primary-200"
           onClick={onResume}
         >
           继续生成
@@ -938,16 +954,16 @@ function ClarifyView({
   return (
     <div className="max-w-2xl mx-auto">
       <div className="text-center mb-6">
-        <h2 className="text-lg font-semibold text-gray-800">补充几个问题</h2>
-        <p className="text-sm text-gray-500 mt-1">回答以下问题可以帮助 Agent 更好地理解你的创作意图（可以只回答部分）</p>
+        <h2 className="text-lg font-serif font-semibold text-gray-800">补充几个问题</h2>
+        <p className="text-sm text-gray-400 mt-1">回答以下问题可以帮助 Agent 更好地理解你的创作意图（可以只回答部分）</p>
       </div>
 
       <div className="space-y-4">
         {questions.map((q, i) => (
-          <div key={i} className="bg-white rounded-lg border p-4">
+          <div key={i} className="bg-white rounded-xl border border-gray-100 p-5 shadow-sm animate-slide-up" style={{ animationDelay: `${i * 80}ms` }}>
             <label className="block text-sm font-medium text-gray-700 mb-2">{q}</label>
             <textarea
-              className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400 resize-y"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent resize-y"
               rows={2}
               placeholder="你的回答..."
               value={answers[i]}
@@ -959,7 +975,7 @@ function ClarifyView({
 
       <div className="text-center mt-6">
         <button
-          className="bg-blue-600 text-white px-8 py-2.5 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
+          className="bg-primary-600 text-white px-8 py-2.5 rounded-xl font-medium hover:bg-primary-700 disabled:opacity-50 cursor-pointer shadow-sm shadow-primary-200"
           onClick={() => onSubmit(answers)}
           disabled={!canSubmit || loading}
         >
@@ -989,36 +1005,36 @@ function CompleteView({
   const chapter = project.chapters.find((c) => c.number === selectedChapter);
 
   const tabClass = (tab: SidebarTab) =>
-    `text-xs px-2 py-1 rounded ${sidebarTab === tab ? 'bg-blue-100 text-blue-700 font-medium' : 'text-gray-500 hover:bg-gray-100'}`;
+    `text-xs px-2.5 py-1 rounded-lg cursor-pointer ${sidebarTab === tab ? 'bg-primary-50 text-primary-700 font-medium' : 'text-gray-400 hover:bg-gray-50 hover:text-gray-600'}`;
 
   return (
     <div className="flex flex-col lg:flex-row gap-6">
-      {/* 左侧导航面板 */}
+      {/* Sidebar */}
       <nav className="w-full lg:w-56 shrink-0">
-        <div className="bg-white rounded-lg border p-3 lg:sticky lg:top-6">
-          {/* Tab 切换 */}
-          <div className="flex gap-1 mb-3 pb-2 border-b">
+        <div className="bg-white rounded-xl border border-gray-100 p-3 lg:sticky lg:top-16 shadow-sm">
+          {/* Tab switch */}
+          <div className="flex gap-1 mb-3 pb-2 border-b border-gray-100">
             <button className={tabClass('chapters')} onClick={() => setSidebarTab('chapters')}>章节</button>
             <button className={tabClass('world')} onClick={() => setSidebarTab('world')}>世界观</button>
             <button className={tabClass('characters')} onClick={() => setSidebarTab('characters')}>角色</button>
             <button className={tabClass('outline')} onClick={() => setSidebarTab('outline')}>大纲</button>
           </div>
 
-          {/* 章节列表 */}
+          {/* Chapter list */}
           {sidebarTab === 'chapters' && (
             <>
               {project.chapters.map((ch) => (
                 <button
                   key={ch.id}
-                  className={`block w-full text-left text-sm px-2 py-1.5 rounded ${
-                    ch.number === selectedChapter ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-50'
+                  className={`block w-full text-left text-sm px-3 py-2 rounded-lg cursor-pointer ${
+                    ch.number === selectedChapter ? 'bg-primary-50 text-primary-700 font-medium' : 'text-gray-600 hover:bg-warm-50'
                   }`}
                   onClick={() => onSelectChapter(ch.number)}
                 >
                   {ch.number}. {ch.title}
                 </button>
               ))}
-              <div className="text-xs text-gray-400 mt-3 pt-2 border-t">
+              <div className="text-xs text-gray-400 mt-3 pt-2 border-t border-gray-100">
                 总字数: {project.chapters.reduce((s, c) => s + c.charCount, 0).toLocaleString()}
               </div>
             </>
@@ -1098,15 +1114,15 @@ function CompleteView({
         </div>
       </nav>
 
-      {/* 右侧阅读区 */}
-      <main className="flex-1 bg-white rounded-lg border p-8 min-h-[60vh]">
+      {/* Reading area */}
+      <main className="flex-1 bg-white rounded-xl border border-gray-100 p-8 sm:p-10 min-h-[60vh] shadow-sm">
         {chapter ? (
           <>
-            <h2 className="text-xl font-bold mb-6">第 {chapter.number} 章：{chapter.title}</h2>
-            <div className="prose prose-sm max-w-none whitespace-pre-wrap text-gray-800 leading-relaxed">
+            <h2 className="text-xl font-serif font-bold text-gray-900 mb-8">第 {chapter.number} 章：{chapter.title}</h2>
+            <div className="prose-literary max-w-none whitespace-pre-wrap text-gray-800 text-[15px]">
               {chapter.content}
             </div>
-            <div className="mt-6 pt-4 border-t">
+            <div className="mt-8 pt-4 border-t border-gray-100">
               <FeedbackButtons
                 currentRating={feedbackData.find((f) => f.targetType === 'chapter' && f.targetId === String(chapter.number))?.rating}
                 onRate={(rating) => onFeedback('chapter', String(chapter.number), rating)}
@@ -1114,7 +1130,7 @@ function CompleteView({
             </div>
           </>
         ) : (
-          <p className="text-gray-400">选择一个章节开始阅读</p>
+          <p className="text-gray-400 font-serif italic">选择一个章节开始阅读</p>
         )}
       </main>
     </div>
@@ -1134,7 +1150,7 @@ function FeedbackButtons({
     <div className="flex items-center justify-center gap-3 py-2">
       <span className="text-xs text-gray-400">对这个结果满意吗？</span>
       <button
-        className={`p-1.5 rounded-md transition-colors ${currentRating === 'satisfied' ? 'bg-green-100 text-green-600' : 'text-gray-300 hover:text-green-500 hover:bg-green-50'}`}
+        className={`p-1.5 rounded-lg cursor-pointer ${currentRating === 'satisfied' ? 'bg-primary-50 text-primary-600' : 'text-gray-300 hover:text-primary-500 hover:bg-primary-50'}`}
         onClick={() => onRate('satisfied')}
         title="满意"
       >
@@ -1143,7 +1159,7 @@ function FeedbackButtons({
         </svg>
       </button>
       <button
-        className={`p-1.5 rounded-md transition-colors ${currentRating === 'unsatisfied' ? 'bg-red-100 text-red-600' : 'text-gray-300 hover:text-red-500 hover:bg-red-50'}`}
+        className={`p-1.5 rounded-lg cursor-pointer ${currentRating === 'unsatisfied' ? 'bg-red-50 text-red-500' : 'text-gray-300 hover:text-red-500 hover:bg-red-50'}`}
         onClick={() => onRate('unsatisfied')}
         title="不满意"
       >
@@ -1178,14 +1194,14 @@ function UsagePanel({ data }: { data: UsageSummary }) {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="mt-8 bg-white rounded-lg border">
+    <div className="mt-8 bg-white rounded-xl border border-gray-100 shadow-sm">
       <button
-        className="w-full px-5 py-3 flex items-center justify-between text-left"
+        className="w-full px-5 py-3 flex items-center justify-between text-left cursor-pointer"
         onClick={() => setOpen(!open)}
       >
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-gray-700">Token 用量</span>
-          <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded">
+          <span className="text-xs bg-warm-100 text-gray-500 px-2 py-0.5 rounded-full">
             {data.total.totalTokens.toLocaleString()} tokens / {data.total.calls} 次调用
           </span>
         </div>
